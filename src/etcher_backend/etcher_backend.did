@@ -1,3 +1,14 @@
-service : {
-    "greet": (text) -> (text) query;
+type BitcoinNetwork = variant { mainnet; regtest; testnet };
+type InitArgs = record { network : BitcoinNetwork };
+type UserQuery = record {
+  user_principal : principal;
+  btc_balance : nat64;
+  p2pkh_address : text;
+  encoded_icrc1_account : text;
+  registered_at : nat64;
+  ckbtc_balance : nat;
+};
+service : (InitArgs) -> {
+  login : () -> (UserQuery) query;
+  register : () -> (UserQuery);
 }
