@@ -9,7 +9,7 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-bitcoin = "0.31.2"
+bitcoin = "0.30.1"
 bs58 = "0.5.1"
 candid = "0.10"
 getrandom = { version = "0.2.14", features = ["custom"] }

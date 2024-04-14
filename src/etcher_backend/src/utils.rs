@@ -1,20 +1,40 @@
-use bitcoin::hashes::ripemd160;
 use candid::Principal;
-use ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
+use ic_cdk::api::management_canister::{bitcoin::BitcoinNetwork, ecdsa::EcdsaKeyId};
 use icrc_ledger_types::icrc1::account::Subaccount;
-use ripemd::Ripemd160;
+use ordinals::Rune;
 use sha2::Digest;
 use tiny_keccak::{Hasher, Sha3};
 
-pub fn generate_p2pkh_address() -> String {
-    todo!()
-}
-
-pub fn generate_subaccount(principal: &Principal, time: &u64) -> Subaccount {
+pub fn generate_derivation_path(principal: &Principal) -> Vec<Vec<u8>> {
     let mut hash = [0u8; 32];
     let mut hasher = Sha3::v256();
     hasher.update(principal.as_slice());
-    hasher.update(time.to_be_bytes().as_ref());
+    hasher.finalize(&mut hash);
+    vec![hash.to_vec()]
+}
+
+pub async fn get_public_key(derivation_path: Vec<Vec<u8>>, key_id: EcdsaKeyId) -> Vec<u8> {
+    ic_cdk::api::management_canister::ecdsa::ecdsa_public_key(
+        ic_cdk::api::management_canister::ecdsa::EcdsaPublicKeyArgument {
+            canister_id: None,
+            derivation_path: derivation_path.clone(),
+            key_id,
+        },
+    )
+    .await
+    .unwrap()
+    .0
+    .public_key
+}
+
+pub fn generate_p2pkh_address(network: BitcoinNetwork, public_key: &[u8]) -> String {
+    public_key_to_p2pkh_address(network, &public_key)
+}
+
+pub fn generate_subaccount(principal: &Principal) -> Subaccount {
+    let mut hash = [0u8; 32];
+    let mut hasher = Sha3::v256();
+    hasher.update(principal.as_slice());
     hasher.finalize(&mut hash);
     hash
 }
@@ -67,4 +87,59 @@ pub fn public_key_to_p2pkh_address(network: BitcoinNetwork, public_key: &[u8]) -
     full_address.extend(checksum);
 
     bs58::encode(full_address).into_string()
+}
+
+// Converts a SEC1 ECDSA signature to the DER format.
+pub fn sec1_to_der(sec1_signature: Vec<u8>) -> Vec<u8> {
+    let r: Vec<u8> = if sec1_signature[0] & 0x80 != 0 {
+        // r is negative. Prepend a zero byte.
+        let mut tmp = vec![0x00];
+        tmp.extend(sec1_signature[..32].to_vec());
+        tmp
+    } else {
+        // r is positive.
+        sec1_signature[..32].to_vec()
+    };
+
+    let s: Vec<u8> = if sec1_signature[32] & 0x80 != 0 {
+        // s is negative. Prepend a zero byte.
+        let mut tmp = vec![0x00];
+        tmp.extend(sec1_signature[32..].to_vec());
+        tmp
+    } else {
+        // s is positive.
+        sec1_signature[32..].to_vec()
+    };
+
+    // Convert signature to DER.
+    vec![
+        vec![0x30, 4 + r.len() as u8 + s.len() as u8, 0x02, r.len() as u8],
+        r,
+        vec![0x02, s.len() as u8],
+        s,
+    ]
+    .into_iter()
+    .flatten()
+    .collect()
+}
+
+/*
+ * JIMMY FOO
+ * 123456789
+ * 10 + 26 * 1 + 9
+ */
+
+pub fn string_to_rune_and_spacers(word: String) -> (Rune, u8) {
+    let mut rune = 0u128;
+    let mut spacers: u8 = 0b0000_0000;
+    let mut space_count = 0;
+    for (i, c) in word.chars().enumerate() {
+        if c == ' ' as char {
+            space_count += 1;
+            continue;
+        }
+        let c = c as u128;
+        rune += (c - 64) + 26 * (i as u128 - space_count);
+    }
+    (Rune(rune), spacers)
 }

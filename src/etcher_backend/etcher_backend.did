@@ -1,14 +1,48 @@
+type Account = record { owner : principal; subaccount : opt blob };
 type BitcoinNetwork = variant { mainnet; regtest; testnet };
-type InitArgs = record { network : BitcoinNetwork };
-type UserQuery = record {
-  user_principal : principal;
-  btc_balance : nat64;
-  p2pkh_address : text;
-  encoded_icrc1_account : text;
-  registered_at : nat64;
-  ckbtc_balance : nat;
+type CandidEtching = record {
+  terms : CandidTerms;
+  premine : opt nat;
+  rune : opt text;
+  divisibility : opt nat8;
+  symbol : opt nat32;
+};
+type CandidTerms = record {
+  cap : opt nat;
+  height : record { opt nat64; opt nat64 };
+  offset : record { opt nat64; opt nat64 };
+  amount : opt nat;
+};
+type InitArgs = record {
+  ckbtc : principal;
+  network : BitcoinNetwork;
+  ckbtc_minter : principal;
+};
+type ReimbursementDeposit = record {
+  account : Account;
+  mint_block_index : nat64;
+  amount : nat64;
+  reason : ReimbursementReason;
+};
+type ReimbursementReason = variant {
+  CallFailed;
+  TaintedDestination : record { kyt_fee : nat64; kyt_provider : principal };
+};
+type RetrieveBtcStatusV2 = variant {
+  Signing;
+  Confirmed : record { txid : blob };
+  Sending : record { txid : blob };
+  AmountTooLow;
+  WillReimburse : ReimbursementDeposit;
+  Unknown;
+  Submitted : record { txid : blob };
+  Reimbursed : ReimbursementDeposit;
+  Pending;
 };
 service : (InitArgs) -> {
-  login : () -> (UserQuery) query;
-  register : () -> (UserQuery);
+  confirm_and_convert_deposit : () -> (nat64, RetrieveBtcStatusV2);
+  etch_rune : (CandidEtching) -> (blob);
+  get_deposit_address_for_bitcoin : () -> (text);
+  get_deposit_address_for_ckbtc : () -> (text) query;
+  query_btc_retrieval_status : (nat64) -> (RetrieveBtcStatusV2) composite_query;
 }
