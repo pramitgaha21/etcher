@@ -128,6 +128,21 @@ pub async fn query_btc_retrieval_status(block_index: u64) -> RetrieveBtcStatusV2
 }
 
 #[update]
+pub async fn query_btc_balance() -> u64 {
+    let caller = validate_caller();
+    let (network, key_id) = STATE.with_borrow(|state| {
+        (
+            state.network.as_ref().unwrap().clone(),
+            state.ecdsa_key.as_ref().unwrap().to_key_id(),
+        )
+    });
+    let derivation_path = generate_derivation_path(&caller);
+    let public_key = get_public_key(derivation_path, key_id).await;
+    let address = generate_p2pkh_address(network.clone(), &public_key);
+    btc_api::get_balance_of(network, &address).await
+}
+
+#[update]
 pub async fn etch_rune(arg: CandidEtching) -> Vec<u8> {
     let caller = validate_caller();
     let (network, key_id) = STATE.with_borrow(|state| {
