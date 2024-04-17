@@ -47,10 +47,7 @@ pub struct CandidEtching {
 
 impl Into<Runestone> for CandidEtching {
     fn into(self) -> Runestone {
-        let symbol = match self.symbol {
-            None => None,
-            Some(symbol) => Some(char::from_u32(symbol).unwrap()),
-        };
+        let symbol = self.symbol.map(|symbol| char::from_u32(symbol).unwrap());
         let etching = Etching {
             terms: Some(self.terms.into()),
             divisibility: self.divisibility,

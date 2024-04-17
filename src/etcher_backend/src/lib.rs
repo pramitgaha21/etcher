@@ -54,7 +54,7 @@ pub async fn get_deposit_address_for_bitcoin() -> String {
     let caller = validate_caller();
     let (network, key_id) = STATE.with_borrow(|state| {
         (
-            state.network.as_ref().unwrap().clone(),
+            *state.network.as_ref().unwrap(),
             state.ecdsa_key.as_ref().unwrap().to_key_id(),
         )
     });
@@ -78,9 +78,9 @@ pub async fn confirm_and_convert_deposit() -> (u64, RetrieveBtcStatusV2) {
     let caller = validate_caller();
     let (ckbtc_minter, ckbtc_ledger, network, key_id) = STATE.with_borrow(|state| {
         (
-            CkBTCMinter::new(state.ckbtc_minter.as_ref().unwrap().clone()),
-            CkBTC::new(state.ckbtc_ledger.as_ref().unwrap().clone()),
-            state.network.as_ref().unwrap().clone(),
+            CkBTCMinter::new(*state.ckbtc_minter.as_ref().unwrap()),
+            CkBTC::new(*state.ckbtc_ledger.as_ref().unwrap()),
+            *state.network.as_ref().unwrap(),
             state.ecdsa_key.as_ref().unwrap().to_key_id(),
         )
     });
@@ -91,10 +91,12 @@ pub async fn confirm_and_convert_deposit() -> (u64, RetrieveBtcStatusV2) {
     // checking for the balance
     let balance = ckbtc_ledger.get_balance_of(deposit_address).await;
     let amount = 10000 + 2000 + 2558;
-    if balance < amount {}
+    if balance < amount {
+        ic_cdk::trap("Not Enough Balance")
+    }
     let derivation_path = generate_derivation_path(&caller);
     let public_key = get_public_key(derivation_path, key_id).await;
-    let address = generate_p2pkh_address(network.clone(), &public_key);
+    let address = generate_p2pkh_address(network, &public_key);
     let result = ckbtc_minter
         .retrieve_btc(RetrieveBtcArgs {
             address,
@@ -121,7 +123,7 @@ pub async fn confirm_and_convert_deposit() -> (u64, RetrieveBtcStatusV2) {
 #[query(composite = true)]
 pub async fn query_btc_retrieval_status(block_index: u64) -> RetrieveBtcStatusV2 {
     let ckbtc_minter =
-        STATE.with_borrow(|state| CkBTCMinter::new(state.ckbtc_minter.as_ref().unwrap().clone()));
+        STATE.with_borrow(|state| CkBTCMinter::new(*state.ckbtc_minter.as_ref().unwrap()));
     ckbtc_minter
         .retrieve_btc_status_v2(RetrieveBtcStatusArgs { block_index })
         .await
@@ -132,13 +134,13 @@ pub async fn query_btc_balance() -> u64 {
     let caller = validate_caller();
     let (network, key_id) = STATE.with_borrow(|state| {
         (
-            state.network.as_ref().unwrap().clone(),
+            *state.network.as_ref().unwrap(),
             state.ecdsa_key.as_ref().unwrap().to_key_id(),
         )
     });
     let derivation_path = generate_derivation_path(&caller);
     let public_key = get_public_key(derivation_path, key_id).await;
-    let address = generate_p2pkh_address(network.clone(), &public_key);
+    let address = generate_p2pkh_address(network, &public_key);
     btc_api::get_balance_of(network, &address).await
 }
 
@@ -147,21 +149,22 @@ pub async fn etch_rune(arg: CandidEtching) -> Vec<u8> {
     let caller = validate_caller();
     let (network, key_id) = STATE.with_borrow(|state| {
         (
-            state.network.as_ref().unwrap().clone(),
+            *state.network.as_ref().unwrap(),
             state.ecdsa_key.as_ref().unwrap().to_key_id(),
         )
     });
     let derivation_path = generate_derivation_path(&caller);
     let public_key = get_public_key(derivation_path.clone(), key_id.clone()).await;
-    let address = generate_p2pkh_address(network.clone(), &public_key);
+    let address = generate_p2pkh_address(network, &public_key);
     // checking for the balance
     let balance = btc_api::get_balance_of(network, &address).await;
     if balance < 10000 {
         ic_cdk::trap("Not Enough Balance")
     }
     let runestone: Runestone = arg.into();
-    let own_utxos = get_utxos(network.clone(), address.clone()).await.utxos;
-    let txn = build_etching_transaction(network.clone(), address.clone(), &own_utxos, runestone);
+    let own_utxos = get_utxos(network, address.clone()).await.utxos;
+    ic_cdk::println!("{:?}", own_utxos);
+    let txn = build_etching_transaction(network, address.clone(), &own_utxos, runestone);
     let txid: [u8; 32] =
         *sign_and_send_txn(network, &public_key, address, txn, key_id, derivation_path)
             .await

@@ -33,6 +33,7 @@
 	"dependencies": {
 		"@dfinity/agent": "^1.2.0",
 		"@dfinity/auth-client": "^1.2.0",
+		"@dfinity/gix-components": "^4.1.0",
 		"@dfinity/ledger-icrc": "^2.2.1"
 	}
 }

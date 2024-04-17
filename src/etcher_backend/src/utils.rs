@@ -28,7 +28,7 @@ pub async fn get_public_key(derivation_path: Vec<Vec<u8>>, key_id: EcdsaKeyId) -
 }
 
 pub fn generate_p2pkh_address(network: BitcoinNetwork, public_key: &[u8]) -> String {
-    public_key_to_p2pkh_address(network, &public_key)
+    public_key_to_p2pkh_address(network, public_key)
 }
 
 pub fn generate_subaccount(principal: &Principal) -> Subaccount {
@@ -123,23 +123,10 @@ pub fn sec1_to_der(sec1_signature: Vec<u8>) -> Vec<u8> {
     .collect()
 }
 
-/*
- * JIMMY FOO
- * 123456789
- * 10 + 26 * 1 + 9
- */
-
 pub fn string_to_rune_and_spacers(word: String) -> (Rune, u8) {
     let mut rune = 0u128;
     let mut spacers: u8 = 0b0000_0000;
     let mut space_count = 0;
-    for (i, c) in word.chars().enumerate() {
-        if c == ' ' as char {
-            space_count += 1;
-            continue;
-        }
-        let c = c as u128;
-        rune += (c - 64) + 26 * (i as u128 - space_count);
-    }
+    // TODO
     (Rune(rune), spacers)
 }

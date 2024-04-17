@@ -1,10 +1,22 @@
 <script lang="ts">
 	import { connectII, identityStore } from '$lib/stores/auth.store';
+	import { message } from '$lib/stores/message.modal';
+	import { HttpAgent } from '@dfinity/agent';
 
 	$: buttonName = $identityStore == null ? 'Connect' : 'Connected';
 
 	const handleClick = async () => {
 		await connectII();
+		let identity = $identityStore;
+		if (identity == null) {
+			message.set({
+				show: true,
+				messageTitle: 'Internet identity not Found',
+				message: 'Internet Identity not Found, Please Login'
+			});
+			return;
+		}
+		const agent = new HttpAgent({ identity });
 	};
 </script>
 

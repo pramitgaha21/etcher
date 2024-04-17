@@ -1,5 +1,29 @@
 {
   "canisters": {
+    "ckbtc_minter": {
+      "candid": "src/ckbtc_minter/ckbtc_minter.did",
+      "wasm": "src/ckbtc_minter/ckbtc_minter.wasm.gz",
+      "type": "custom",
+      "shrink": false
+    },
+    "ckbtc_ledger": {
+      "candid": "src/ckbtc_ledger/ckbtc_ledger.did",
+      "wasm": "src/ckbtc_ledger/ckbtc_ledger.wasm.gz",
+      "type": "custom",
+      "shrink": false
+    },
+    "ckbtc_kyt": {
+      "candid": "src/ckbtc_kyt/ckbtc_kyt.did",
+      "wasm": "src/ckbtc_kyt/ckbtc_kyt.wasm.gz",
+      "type": "custom",
+      "shrink": false
+    },
+    "ckbtc_index": {
+      "candid": "src/ckbtc_index/ckbtc_index.did",
+      "wasm": "src/ckbtc_index/ckbtc_index.wasm.gz",
+      "type": "custom",
+      "shrink": false
+    },
     "etcher_backend": {
       "candid": "src/etcher_backend/etcher_backend.did",
       "declarations": {
@@ -9,12 +33,8 @@
       "type": "rust"
     },
     "etcher_frontend": {
-      "dependencies": [
-        "etcher_backend"
-      ],
-      "source": [
-        "src/etcher_frontend/dist"
-      ],
+      "dependencies": ["etcher_backend"],
+      "source": ["src/etcher_frontend/dist"],
       "type": "assets",
       "workspace": "etcher_frontend"
     },
@@ -34,9 +54,7 @@
     "bitcoin": {
       "enabled": true,
       "log_level": "info",
-      "nodes": [
-        "127.0.0.1:18444"
-      ]
+      "nodes": ["127.0.0.1:18444"]
     },
     "build": {
       "args": "",
