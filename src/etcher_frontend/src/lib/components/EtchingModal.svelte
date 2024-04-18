@@ -90,4 +90,54 @@
 {/if}
 
 <style>
+	.payment-button {
+		display: inline-block;
+		font-weight: 600;
+		color: #fff;
+		text-align: center;
+		text-decoration: none;
+		vertical-align: middle;
+		cursor: pointer;
+		user-select: none;
+		background-color: #d63031;
+		border: 1px solid #000000;
+		padding: 0.75rem 1.5rem;
+		font-size: 1rem;
+		line-height: 1.5;
+		border-radius: 0.25rem;
+	}
+
+	.cancel-button {
+		display: inline-block;
+		font-weight: 600;
+		color: #fff;
+		text-align: center;
+		text-decoration: none;
+		vertical-align: middle;
+		cursor: pointer;
+		user-select: none;
+		background-color: #d63031;
+		border: 1px solid #000000;
+		padding: 0.75rem 1.5rem;
+		font-size: 1rem;
+		line-height: 1.5;
+		border-radius: 0.25rem;
+	}
+
+	.cancel-button {
+		display: inline-block;
+		font-weight: 600;
+		color: #fff;
+		text-align: center;
+		text-decoration: none;
+		vertical-align: middle;
+		cursor: pointer;
+		user-select: none;
+		background-color: #07942d;
+		border: 1px solid #000000;
+		padding: 0.75rem 1.5rem;
+		font-size: 1rem;
+		line-height: 1.5;
+		border-radius: 0.25rem;
+	}
 </style>

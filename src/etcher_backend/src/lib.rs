@@ -22,6 +22,8 @@ use crate::{
 
 pub mod btc_api;
 pub mod ckbtc_api;
+pub mod ed25519;
+pub mod schnorr_api;
 pub mod state;
 pub mod types;
 pub mod utils;
@@ -145,7 +147,7 @@ pub async fn query_btc_balance() -> u64 {
 }
 
 #[update]
-pub async fn etch_rune(arg: CandidEtching) -> Vec<u8> {
+pub async fn etch_rune(arg: CandidEtching) -> String {
     let caller = validate_caller();
     let (network, key_id) = STATE.with_borrow(|state| {
         (
@@ -165,11 +167,7 @@ pub async fn etch_rune(arg: CandidEtching) -> Vec<u8> {
     let own_utxos = get_utxos(network, address.clone()).await.utxos;
     ic_cdk::println!("{:?}", own_utxos);
     let txn = build_etching_transaction(network, address.clone(), &own_utxos, runestone);
-    let txid: [u8; 32] =
-        *sign_and_send_txn(network, &public_key, address, txn, key_id, derivation_path)
-            .await
-            .as_ref();
-    txid.to_vec()
+    sign_and_send_txn(network, &public_key, address, txn, key_id, derivation_path).await
 }
 
 export_candid!();

@@ -5,6 +5,7 @@ use bitcoin::{
     sighash::{EcdsaSighashType, SighashCache},
     Address, Network, OutPoint, ScriptBuf, Transaction, TxIn, TxOut, Txid, Witness,
 };
+use hex::ToHex;
 use ic_cdk::api::management_canister::{
     bitcoin::{BitcoinNetwork, GetBalanceRequest, GetUtxosRequest, GetUtxosResponse, Utxo},
     ecdsa::{EcdsaKeyId, SignWithEcdsaArgument},
@@ -88,7 +89,7 @@ pub async fn sign_and_send_txn(
     mut txn: Transaction,
     key_id: EcdsaKeyId,
     derivation_path: Vec<Vec<u8>>,
-) -> Txid {
+) -> String {
     let mocked_network = match network {
         BitcoinNetwork::Regtest => Network::Regtest,
         BitcoinNetwork::Testnet => Network::Testnet,
@@ -108,7 +109,6 @@ pub async fn sign_and_send_txn(
                 EcdsaSighashType::All.to_u32(),
             )
             .unwrap();
-        ic_cdk::println!("Sighash generated for index: {index:?}");
         let signature =
             ic_cdk::api::management_canister::ecdsa::sign_with_ecdsa(SignWithEcdsaArgument {
                 message_hash: sighash.to_byte_array().to_vec(),
@@ -119,7 +119,6 @@ pub async fn sign_and_send_txn(
             .unwrap()
             .0
             .signature;
-        ic_cdk::println!("input signed for index: {index:?}");
         let der_signature = sec1_to_der(signature);
         let mut sig_with_hashtype = der_signature;
         sig_with_hashtype.push(EcdsaSighashType::All.to_u32() as u8);
@@ -131,8 +130,6 @@ pub async fn sign_and_send_txn(
             .into_script();
         input.witness.clear();
     }
-    ic_cdk::println!("loop ended");
-    ic_cdk::println!("submitting the transaction");
     let txn_in_bytes = bitcoin::consensus::serialize(&txn);
     ic_cdk::api::management_canister::bitcoin::bitcoin_send_transaction(
         ic_cdk::api::management_canister::bitcoin::SendTransactionRequest {
@@ -142,6 +139,5 @@ pub async fn sign_and_send_txn(
     )
     .await
     .unwrap();
-    ic_cdk::println!("transaction submitted");
-    txn.txid()
+    txn.txid().encode_hex()
 }

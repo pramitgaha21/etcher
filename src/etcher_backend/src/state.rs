@@ -27,6 +27,46 @@ impl EcdsaKeyIds {
     }
 }
 
+#[derive(CandidType, Serialize, Deserialize, Debug)]
+pub enum SchnorrKeyIds {
+    DfxTestKey,
+    TestKey1,
+    DfxTestKeyEd25519,
+    TestKey1Ed25519,
+}
+
+impl SchnorrKeyIds {
+    pub fn to_key_id(&self) -> SchnorrKeyId {
+        match self {
+            Self::DfxTestKey => SchnorrKeyId {
+                algorithm: SchnorrAlgorithm::Bip340Secp256k1,
+                name: "dfx_test_key".to_string(),
+            },
+            Self::TestKey1 => SchnorrKeyId {
+                algorithm: SchnorrAlgorithm::Bip340Secp256k1,
+                name: "test_key_1".to_string(),
+            },
+            Self::DfxTestKeyEd25519 => SchnorrKeyId {
+                algorithm: SchnorrAlgorithm::Ed25519,
+                name: "dfx_test_key".to_string(),
+            },
+            Self::TestKey1Ed25519 => SchnorrKeyId {
+                algorithm: SchnorrAlgorithm::Ed25519,
+                name: "test_key_1".to_string(),
+            },
+        }
+    }
+
+    fn variants() -> Vec<SchnorrKeyIds> {
+        vec![
+            SchnorrKeyIds::DfxTestKey,
+            SchnorrKeyIds::TestKey1,
+            SchnorrKeyIds::DfxTestKeyEd25519,
+            SchnorrKeyIds::TestKey1Ed25519,
+        ]
+    }
+}
+
 #[derive(Serialize, Deserialize, Default)]
 pub struct State {
     pub auth: Option<Principal>,
