@@ -1,52 +1,78 @@
-use bip32::{Seed, XPrv};
-use bitcoin::{
-    key::{Secp256k1, UntweakedKeypair},
-    secp256k1::Message,
-};
-use bitcoin_hashes::{sha256, Hash};
-use candid::{CandidType, Decode, Deserialize, Encode, Principal};
-use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
-use ic_crypto_extended_bip32::{DerivationIndex, DerivationPath};
-use serde::Serialize;
-use serde_bytes::ByteBuf;
+use candid::{CandidType, Principal};
+use serde::{Deserialize, Serialize};
 
-const MAX_VALUE_SIZE: u32 = 100;
+use crate::STATE;
 
-#[derive(CandidType, Deserialize, Serialize, Debug)]
-pub struct SchnorrPublicKeyArgs {
-    pub canister_id: Option<Principal>,
-    pub derivation_path: Vec<ByteBuf>,
-    pub key_id: SchnorrKeyId,
-}
-
-#[derive(CandidType, Deserialize, Debug)]
-pub struct SchnorrPublicKeyResult {
-    pub public_key: ByteBuf,
-    pub chain_code: ByteBuf,
-}
-
-#[derive(CandidType, Deserialize, Serialize, Debug)]
-pub struct SignWithSchnorrArgs {
-    pub message: ByteBuf,
-    pub derivation_path: Vec<ByteBuf>,
-    pub key_id: SchnorrKeyId,
-}
-
-#[derive(CandidType, Deserialize, Debug)]
-pub struct SignWithSchnorrResult {
-    pub signature: ByteBuf,
-}
-
-#[derive(CandidType, Deserialize, Serialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum SchnorrAlgorithm {
-    #[serde(rename = "bip340secp256k1")]
-    Bip340Secp256k1,
-    #[serde(rename = "ed25519")]
-    Ed25519,
-}
-
-#[derive(CandidType, Deserialize, Serialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(CandidType, Deserialize, Serialize, Debug, Clone)]
 pub struct SchnorrKeyId {
-    algorithm: SchnorrAlgorithm,
-    name: String,
+    pub name: String,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Debug)]
+struct SchnorrPublicKey {
+    pub canister_id: Option<Principal>,
+    pub derivation_path: Vec<Vec<u8>>,
+    pub key_id: SchnorrKeyId,
+}
+
+#[derive(CandidType, Deserialize, Debug)]
+struct SchnorrPublicKeyReply {
+    pub public_key: Vec<u8>,
+    pub chain_code: Vec<u8>,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Debug)]
+struct SignWithSchnorr {
+    pub message: Vec<u8>,
+    pub derivation_path: Vec<Vec<u8>>,
+    pub key_id: SchnorrKeyId,
+}
+
+#[derive(CandidType, Deserialize, Debug)]
+struct SignWithSchnorrReply {
+    pub signature: Vec<u8>,
+}
+
+pub async fn get_schnorr_public_key(derivation_path: Vec<Vec<u8>>) -> Vec<u8> {
+    let (schnorr_canister, key_id) = STATE.with_borrow(|state| {
+        (
+            *state.schnorr_canister.as_ref().unwrap(),
+            state.schnorr_key.as_ref().unwrap().clone(),
+        )
+    });
+    ic_cdk::call::<(SchnorrPublicKey,), (SchnorrPublicKeyReply,)>(
+        schnorr_canister,
+        "schnorr_public_key",
+        (SchnorrPublicKey {
+            canister_id: None,
+            derivation_path,
+            key_id,
+        },),
+    )
+    .await
+    .unwrap()
+    .0
+    .public_key
+}
+
+pub async fn schnorr_sign(message: Vec<u8>, derivation_path: Vec<Vec<u8>>) -> Vec<u8> {
+    let (schnorr_canister, key_id) = STATE.with_borrow(|state| {
+        (
+            *state.schnorr_canister.as_ref().unwrap(),
+            state.schnorr_key.as_ref().unwrap().clone(),
+        )
+    });
+    ic_cdk::call::<(SignWithSchnorr,), (SignWithSchnorrReply,)>(
+        schnorr_canister,
+        "sign_with_schnorr",
+        (SignWithSchnorr {
+            message,
+            derivation_path,
+            key_id,
+        },),
+    )
+    .await
+    .unwrap()
+    .0
+    .signature
 }

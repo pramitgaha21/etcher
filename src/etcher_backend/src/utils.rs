@@ -5,30 +5,14 @@ use ordinals::Rune;
 use sha2::Digest;
 use tiny_keccak::{Hasher, Sha3};
 
+use crate::STATE;
+
 pub fn generate_derivation_path(principal: &Principal) -> Vec<Vec<u8>> {
     let mut hash = [0u8; 32];
     let mut hasher = Sha3::v256();
     hasher.update(principal.as_slice());
     hasher.finalize(&mut hash);
     vec![hash.to_vec()]
-}
-
-pub async fn get_public_key(derivation_path: Vec<Vec<u8>>, key_id: EcdsaKeyId) -> Vec<u8> {
-    ic_cdk::api::management_canister::ecdsa::ecdsa_public_key(
-        ic_cdk::api::management_canister::ecdsa::EcdsaPublicKeyArgument {
-            canister_id: None,
-            derivation_path: derivation_path.clone(),
-            key_id,
-        },
-    )
-    .await
-    .unwrap()
-    .0
-    .public_key
-}
-
-pub fn generate_p2pkh_address(network: BitcoinNetwork, public_key: &[u8]) -> String {
-    public_key_to_p2pkh_address(network, public_key)
 }
 
 pub fn generate_subaccount(principal: &Principal) -> Subaccount {
@@ -70,7 +54,8 @@ fn ripemd160(data: &[u8]) -> Vec<u8> {
 }
 
 // Converts a public key to a P2PKH address.
-pub fn public_key_to_p2pkh_address(network: BitcoinNetwork, public_key: &[u8]) -> String {
+pub fn public_key_to_p2pkh_address(public_key: &[u8]) -> String {
+    let network = STATE.with_borrow(|state| *state.network.as_ref().unwrap());
     // SHA-256 & RIPEMD-160
     let result = ripemd160(&sha256(public_key));
 
@@ -121,12 +106,4 @@ pub fn sec1_to_der(sec1_signature: Vec<u8>) -> Vec<u8> {
     .into_iter()
     .flatten()
     .collect()
-}
-
-pub fn string_to_rune_and_spacers(word: String) -> (Rune, u8) {
-    let mut rune = 0u128;
-    let mut spacers: u8 = 0b0000_0000;
-    let mut space_count = 0;
-    // TODO
-    (Rune(rune), spacers)
 }
