@@ -20,6 +20,19 @@
 		payWithBitcoin = false;
 	};
 
+	const confirmAndConvertCkbtc = async () => {
+		let identity = $identityStore;
+		if (identity == null) {
+			message.set({
+				show: true,
+				messageTitle: 'Internet identity not Found',
+				message: 'Internet Identity not Found, Please Login'
+			});
+			return;
+		}
+		const agent = new HttpAgent({ identity });
+	};
+
 	const fetchRetrievalStatus = async () => {
 		let identity = $identityStore;
 		if (identity == null) {
@@ -77,7 +90,9 @@
 				{:else}
 					<h1>Paying with ckBTC</h1>
 					<QRCode value={$ckbtcDepositAddress} ariaLabel="ckBTC Deposit Address" />
-					<button>Confirm Deposit</button>
+					<button class="ckbtc-confirm-payment-deposit-button" on:click={confirmAndConvertCkbtc}
+						>Confirm Deposit</button
+					>
 					<p class="payment-status">Payment Status</p>
 				{/if}
 			{/if}

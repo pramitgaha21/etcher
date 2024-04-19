@@ -32,6 +32,11 @@
       "package": "etcher_backend",
       "type": "rust"
     },
+    "schnorr_canister": {
+      "type": "custom",
+      "wasm": "",
+      "candid": ""
+    },
     "etcher_frontend": {
       "dependencies": ["etcher_backend"],
       "source": ["src/etcher_frontend/dist"],

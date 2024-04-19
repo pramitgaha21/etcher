@@ -17,7 +17,7 @@ use utils::generate_subaccount;
 use crate::{
     ecdsa_api::get_ecdsa_public_key,
     schnorr_api::get_schnorr_public_key,
-    utils::{generate_derivation_path, public_key_to_p2pkh_address, validate_caller},
+    utils::{always_fail, generate_derivation_path, public_key_to_p2pkh_address, validate_caller},
 };
 
 pub mod btc_api;
@@ -66,15 +66,20 @@ pub struct InitArgs {
     pub ckbtc_minter: Principal,
     pub network: BitcoinNetwork,
     pub ecdsa_key: EcdsaKeyIds,
+    pub schnorr_key: SchnorrKeyId,
+    pub schnorr_canister: Principal,
 }
 
 #[init]
 pub fn init(arg: InitArgs) {
+    getrandom::register_custom_getrandom!(always_fail);
     STATE.with_borrow_mut(|state| {
         state.network = Some(arg.network);
         state.ckbtc_minter = Some(arg.ckbtc_minter);
         state.ckbtc_ledger = Some(arg.ckbtc_ledger);
         state.ecdsa_key = Some(arg.ecdsa_key);
+        state.schnorr_canister = Some(arg.schnorr_canister);
+        state.schnorr_key = Some(arg.schnorr_key);
     })
 }
 
@@ -115,6 +120,12 @@ pub struct EtchingArgs {
     pub divisibility: u8,
     pub symbol: Option<u32>,
     pub rune: String,
+    pub amount: Option<u128>,
+    pub cap: Option<u128>,
+    pub height_start: Option<u64>,
+    pub height_stop: Option<u64>,
+    pub offset_start: Option<u64>,
+    pub offset_stop: Option<u64>,
 }
 
 pub async fn etch_rune(args: EtchingArgs) -> (String, String) {

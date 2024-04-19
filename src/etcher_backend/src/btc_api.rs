@@ -38,6 +38,21 @@ pub async fn get_utxos_of(address: String) -> Vec<Utxo> {
     .utxos
 }
 
+pub async fn send_bitcoin_transaction(txn: Transaction) -> String {
+    let transaction = bitcoin::consensus::serialize(&txn);
+    let network = STATE.with_borrow(|state| *state.network.as_ref().unwrap());
+    ic_cdk::api::management_canister::bitcoin::bitcoin_send_transaction(
+        ic_cdk::api::management_canister::bitcoin::SendTransactionRequest {
+            transaction,
+            network,
+        },
+    )
+    .await
+    .unwrap();
+    txn.txid();
+    todo!()
+}
+
 pub fn build_reveal_transaction(
     commit_input_index: usize,
     control_block: &ControlBlock,
@@ -75,16 +90,21 @@ pub fn build_reveal_transaction(
                 txin.witness = Witness::from_slice(&[&[0; SCHNORR_SIGNATURE_SIZE]]);
             }
         }
-        todo!()
+        Amount::from_sat(
+            (fee_rate.to_sat_per_kwu() as f64 * reveal_txn_clone.vsize() as f64).round() as u64,
+        )
     };
     (reveal_txn, fee)
 }
 
-pub fn build_etching_transaction(
+pub fn build_and_sign_etching_transaction(
     etching: Etching,
     derivation_path: &Vec<Vec<u8>>,
+    ecdsa_public_key: &[u8],
+    schnorr_public_key: &[u8],
+    caller_p2pkh_address: String,
 ) -> (Transaction, Transaction) {
+    let mut reveal_input = vec![OutPoint::null()];
+    let mut reveal_output = vec![];
     todo!()
 }
-
-pub fn sign_transaction() {}
