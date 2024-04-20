@@ -118,7 +118,7 @@ pub fn string_to_rune_and_spacer(word: &str) -> (Rune, u8) {
             // TODO: updating the spacer
             continue;
         }
-        rune += (c as u128 - 64) * 26_u128.pow(i as u32);
+        rune += (c as u128 - 64) * 26_u128.pow((i - space_count) as u32);
         // TODO: updating the spacer
     }
     (Rune(rune - 1), spacer)
