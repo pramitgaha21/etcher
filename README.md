@@ -16,5 +16,5 @@ chmod +x gen_candid.sh
 dfx start --clean # run the localhost in a different terminal
 
 chmod +x deploy.sh
-./deploy.sh
+./deploy.sh # Deploys all the canisters
 ```
