@@ -34,8 +34,8 @@
     },
     "schnorr_canister": {
       "type": "custom",
-      "wasm": "",
-      "candid": ""
+      "candid": "https://github.com/domwoe/schnorr_canister/releases/latest/download/schnorr_canister.did",
+      "wasm": "https://github.com/domwoe/schnorr_canister/releases/latest/download/schnorr_canister.wasm.gz"
     },
     "etcher_frontend": {
       "dependencies": ["etcher_backend"],
@@ -58,7 +58,7 @@
   "defaults": {
     "bitcoin": {
       "enabled": true,
-      "log_level": "info",
+      "log_level": "error",
       "nodes": ["127.0.0.1:18444"]
     },
     "build": {

@@ -4,7 +4,16 @@ use serde::{Deserialize, Serialize};
 use crate::STATE;
 
 #[derive(CandidType, Deserialize, Serialize, Debug, Clone)]
+pub enum SchnorrAlgorithm {
+    #[serde(rename = "bip340secp256k1")]
+    Bip340Secp256k1,
+    #[serde(rename = "ed25519")]
+    Ed25519,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Debug, Clone)]
 pub struct SchnorrKeyId {
+    pub algorithm: SchnorrAlgorithm,
     pub name: String,
 }
 

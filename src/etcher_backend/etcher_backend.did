@@ -1,0 +1,45 @@
+type Account = record { owner : principal; subaccount : opt blob };
+type BitcoinNetwork = variant { mainnet; regtest; testnet };
+type EtchingArgs = record {
+  cap : opt nat;
+  turbo : bool;
+  rune : text;
+  divisibility : nat8;
+  amount : opt nat;
+  symbol : opt nat32;
+};
+type InitArgs = record {
+  network : BitcoinNetwork;
+  ckbtc_minter : principal;
+  schnorr_canister : principal;
+  ckbtc_ledger : principal;
+};
+type ReimbursementDeposit = record {
+  account : Account;
+  mint_block_index : nat64;
+  amount : nat64;
+  reason : ReimbursementReason;
+};
+type ReimbursementReason = variant {
+  CallFailed;
+  TaintedDestination : record { kyt_fee : nat64; kyt_provider : principal };
+};
+type RetrieveBtcStatusV2 = variant {
+  Signing;
+  Confirmed : record { txid : blob };
+  Sending : record { txid : blob };
+  AmountTooLow;
+  WillReimburse : ReimbursementDeposit;
+  Unknown;
+  Submitted : record { txid : blob };
+  Reimbursed : ReimbursementDeposit;
+  Pending;
+};
+service : (InitArgs) -> {
+  confirm_and_convert_ckbtc : () -> (nat64);
+  etch_rune : (EtchingArgs) -> (text, text);
+  get_btc_balance : () -> (nat64);
+  get_deposit_address_for_bitcoin : () -> (text);
+  get_deposit_address_for_ckbtc : () -> (text) query;
+  query_converstion_status : (nat64) -> (RetrieveBtcStatusV2) composite_query;
+}

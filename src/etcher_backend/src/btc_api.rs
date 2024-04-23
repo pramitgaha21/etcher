@@ -2,10 +2,12 @@ use std::str::FromStr;
 
 use bitcoin::{
     absolute::LockTime,
-    hashes::Hash,
+    hashes::{sha256, Hash},
     opcodes,
     script::{Builder, PushBytes},
-    secp256k1::{constants::SCHNORR_SIGNATURE_SIZE, schnorr, PublicKey, Secp256k1, XOnlyPublicKey},
+    secp256k1::{
+        constants::SCHNORR_SIGNATURE_SIZE, schnorr, Message, PublicKey, Secp256k1, XOnlyPublicKey,
+    },
     sighash::{EcdsaSighashType, Prevouts, SighashCache, TapSighashType},
     taproot::{ControlBlock, LeafVersion, Signature, TapLeafHash, TaprootBuilder},
     Address, Amount, FeeRate, Network, OutPoint, Script, ScriptBuf, Sequence, Transaction, TxIn,
@@ -13,7 +15,7 @@ use bitcoin::{
 };
 use hex::ToHex;
 use ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Utxo};
-use ordinals::{Etching, Runestone};
+use ordinals::{Etching, Runestone, Terms};
 
 use crate::{
     ecdsa_api::ecdsa_sign,
@@ -136,9 +138,14 @@ pub async fn build_and_sign_etching_transaction(
             divisibility: Some(etching_args.divisibility),
             premine: None,
             rune: Some(rune),
-            spacers: None,
+            spacers: Some(spacers),
             symbol,
-            terms: None,
+            terms: Some(Terms {
+                amount: etching_args.amount,
+                cap: etching_args.cap,
+                offset: (None, None),
+                height: (None, None),
+            }),
             turbo: etching_args.turbo,
         }),
         mint: None,
@@ -157,8 +164,20 @@ pub async fn build_and_sign_etching_transaction(
         PublicKey::from_slice(schnorr_public_key).unwrap().into();
     // building of reveal script
     let secpk256k1 = Secp256k1::new();
-    // TODO: adding rune as le bytes
+    let mut runes_as_lebytes = rune.0.to_le_bytes().to_vec();
+    let mut count = runes_as_lebytes.len() - 1;
+    while count != 0 {
+        if runes_as_lebytes[count] == 0 {
+            runes_as_lebytes.pop();
+            count -= 1;
+            continue;
+        } else {
+            break;
+        }
+    }
+    let runes_as_pushbytes: &PushBytes = runes_as_lebytes.as_slice().try_into().unwrap();
     let builder = Builder::new()
+        .push_slice(runes_as_pushbytes)
         .push_slice(schnorr_public_key.serialize())
         .push_opcode(opcodes::all::OP_CHECKSIG);
     let reveal_script = builder.into_script();
@@ -183,8 +202,7 @@ pub async fn build_and_sign_etching_transaction(
         .unwrap()
         .assume_checked();
     let commit_tx_address = Address::p2tr_tweaked(taproot_send_info.output_key(), network);
-    // TODO: calculating fee_rate
-    let fee_rate = FeeRate::ZERO;
+    let fee_rate = FeeRate::from_sat_per_vb(10).unwrap();
     let (_, reveal_fee) = build_reveal_transaction(
         commit_input_index,
         &control_block,
@@ -193,7 +211,6 @@ pub async fn build_and_sign_etching_transaction(
         reveal_input.clone(),
         &reveal_script,
     );
-
     let mut utxos_to_spend = vec![];
     let mut total_spent = 0;
     for utxo in owned_utxos.iter().rev() {
@@ -254,6 +271,10 @@ pub async fn build_and_sign_etching_transaction(
         txid: commit_tx.txid(),
         vout: vout.try_into().unwrap(),
     };
+    reveal_output = vec![TxOut {
+        script_pubkey: caller_address.script_pubkey(),
+        value: total_spent - commit_fee.to_sat_per_kwu() - reveal_fee.to_sat(),
+    }];
     let (mut reveal_tx, _) = build_reveal_transaction(
         commit_input_index,
         &control_block,
@@ -262,19 +283,49 @@ pub async fn build_and_sign_etching_transaction(
         reveal_input,
         &reveal_script,
     );
-    let mut prevouts = vec![];
-    prevouts.push(commit_tx.output[vout].clone());
+    // let prevouts = vec![commit_tx.output[vout].clone()];
+    let leaf_hash = TapLeafHash::from_script(&reveal_script, LeafVersion::TapScript);
     let mut sighash_cache = SighashCache::new(&mut reveal_tx);
-    let sighash = sighash_cache
-        .taproot_script_spend_signature_hash(
+    // let sighash = sighash_cache
+    //     .taproot_script_spend_signature_hash(
+    //         commit_input_index,
+    //         &Prevouts::All(&prevouts),
+    //         TapLeafHash::from_script(&reveal_script, LeafVersion::TapScript),
+    //         TapSighashType::Default,
+    //     )
+    //     .expect("Failed to taproot spend");
+    // let msg = sighash.to_byte_array().to_vec();
+    let mut signing_data = vec![];
+    sighash_cache
+        .taproot_encode_signing_data_to(
+            &mut signing_data,
             commit_input_index,
-            &Prevouts::All(&prevouts),
-            TapLeafHash::from_script(&reveal_script, LeafVersion::TapScript),
+            &Prevouts::All(commit_tx.output.as_slice()),
+            None,
+            Some((leaf_hash, 0xFFFFFFFF)),
             TapSighashType::Default,
         )
-        .expect("Failed to taproot spend");
-    let msg = sighash.to_byte_array().to_vec();
-    let schnorr_signature = schnorr_api::schnorr_sign(msg, derivation_path.clone()).await;
+        .expect("Failed to sign data");
+    let tag = b"TapSighash";
+    let mut hashed_tag = sha256::Hash::hash(tag).to_byte_array().to_vec();
+    let mut prefix = hashed_tag.clone();
+    prefix.append(&mut hashed_tag);
+    let signing_data: Vec<_> = prefix.iter().chain(signing_data.iter()).cloned().collect();
+    let schnorr_signature =
+        schnorr_api::schnorr_sign(signing_data.clone(), derivation_path.clone()).await;
+
+    // Verify the signature to be sure that signing works
+    let secp = bitcoin::secp256k1::Secp256k1::verification_only();
+
+    let sig_ = schnorr::Signature::from_slice(&schnorr_signature).unwrap();
+
+    let digest = sha256::Hash::hash(&signing_data).to_byte_array();
+    let msg = Message::from_slice(&digest).unwrap();
+
+    assert!(secp
+        .verify_schnorr(&sig_, &msg, &schnorr_public_key)
+        .is_ok());
+
     let witness = sighash_cache
         .witness_mut(commit_input_index)
         .expect("failed getting mutable witness");

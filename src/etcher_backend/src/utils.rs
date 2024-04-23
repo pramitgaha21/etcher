@@ -108,9 +108,9 @@ pub fn sec1_to_der(sec1_signature: Vec<u8>) -> Vec<u8> {
     .collect()
 }
 
-pub fn string_to_rune_and_spacer(word: &str) -> (Rune, u8) {
+pub fn string_to_rune_and_spacer(word: &str) -> (Rune, u32) {
     let mut rune = 0;
-    let mut spacer = 0u8;
+    let mut spacer = 0u32;
     let mut space_count = 0;
     for (i, c) in word.chars().rev().enumerate() {
         if c == ' ' {

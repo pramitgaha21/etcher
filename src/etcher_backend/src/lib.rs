@@ -3,6 +3,7 @@
 use std::cell::RefCell;
 
 use candid::{CandidType, Principal};
+use ckbtc_api::{CkBTC, CkBTCMinter, RetrieveBtcStatusV2};
 use ic_cdk::{
     api::management_canister::{
         bitcoin::BitcoinNetwork,
@@ -17,6 +18,7 @@ use utils::generate_subaccount;
 
 use crate::{
     btc_api::build_and_sign_etching_transaction,
+    ckbtc_api::RetrieveBtcArgs,
     ecdsa_api::get_ecdsa_public_key,
     schnorr_api::get_schnorr_public_key,
     utils::{always_fail, generate_derivation_path, public_key_to_p2pkh_address, validate_caller},
@@ -67,21 +69,42 @@ pub struct InitArgs {
     pub ckbtc_ledger: Principal,
     pub ckbtc_minter: Principal,
     pub network: BitcoinNetwork,
-    pub ecdsa_key: EcdsaKeyIds,
-    pub schnorr_key: SchnorrKeyId,
     pub schnorr_canister: Principal,
 }
 
 #[init]
 pub fn init(arg: InitArgs) {
     getrandom::register_custom_getrandom!(always_fail);
+    let (ecdsa_key_id, schnorr_key) = match arg.network {
+        BitcoinNetwork::Mainnet => (
+            EcdsaKeyIds::ProductionKey,
+            SchnorrKeyId {
+                name: "test_key_1".to_string(),
+                algorithm: schnorr_api::SchnorrAlgorithm::Bip340Secp256k1,
+            },
+        ),
+        BitcoinNetwork::Regtest => (
+            EcdsaKeyIds::TestKeyLocalDevelopment,
+            SchnorrKeyId {
+                name: "dfx_test_key".to_string(),
+                algorithm: schnorr_api::SchnorrAlgorithm::Bip340Secp256k1,
+            },
+        ),
+        BitcoinNetwork::Testnet => (
+            EcdsaKeyIds::TestKey1,
+            SchnorrKeyId {
+                name: "test_key_1".to_string(),
+                algorithm: schnorr_api::SchnorrAlgorithm::Bip340Secp256k1,
+            },
+        ),
+    };
     STATE.with_borrow_mut(|state| {
         state.network = Some(arg.network);
         state.ckbtc_minter = Some(arg.ckbtc_minter);
         state.ckbtc_ledger = Some(arg.ckbtc_ledger);
-        state.ecdsa_key = Some(arg.ecdsa_key);
+        state.ecdsa_key = Some(ecdsa_key_id);
         state.schnorr_canister = Some(arg.schnorr_canister);
-        state.schnorr_key = Some(arg.schnorr_key);
+        state.schnorr_key = Some(schnorr_key);
     })
 }
 
@@ -113,14 +136,51 @@ pub fn get_deposit_address_for_ckbtc() -> String {
     .to_string()
 }
 
-pub async fn confirm_and_convert_ckbtc() {
+#[update]
+pub async fn confirm_and_convert_ckbtc() -> u64 {
     let caller = validate_caller();
     let subaccount = generate_subaccount(&caller);
-    // TODO
-    todo!()
+    let account = Account {
+        owner: ic_cdk::id(),
+        subaccount: Some(subaccount),
+    };
+    let (ckbtc_minter, ckbtc_ledger) = STATE.with_borrow(|state| {
+        let ckbtc_minter = *state.ckbtc_minter.as_ref().unwrap();
+        let ckbtc_ledger = *state.ckbtc_ledger.as_ref().unwrap();
+        (CkBTCMinter::new(ckbtc_minter), CkBTC::new(ckbtc_ledger))
+    });
+    let balance = ckbtc_ledger.get_balance_of(account).await;
+    if balance < 20000 {
+        ic_cdk::trap("Not enough balance")
+    }
+    let derivation_path = generate_derivation_path(&caller);
+    let ecdsa_public_key = get_ecdsa_public_key(derivation_path.clone()).await;
+    let caller_p2pkh_address = public_key_to_p2pkh_address(&ecdsa_public_key);
+    let result = ckbtc_minter
+        .retrieve_btc(RetrieveBtcArgs {
+            address: caller_p2pkh_address,
+            amount: balance as u64,
+        })
+        .await;
+    match result {
+        Err(e) => {
+            let err = format!("{:?}", e);
+            ic_cdk::trap(&err)
+        }
+        Ok(ok) => ok.block_index,
+    }
 }
 
-pub async fn query_converstion_status() {}
+#[query(composite = true)]
+pub async fn query_converstion_status(block_index: u64) -> RetrieveBtcStatusV2 {
+    let ckbtc_minter = STATE.with_borrow(|state| {
+        let canister_id = *state.ckbtc_minter.as_ref().unwrap();
+        CkBTCMinter::new(canister_id)
+    });
+    ckbtc_minter
+        .retrieve_btc_status_v2(ckbtc_api::RetrieveBtcStatusArgs { block_index })
+        .await
+}
 
 #[derive(CandidType, Deserialize, Debug)]
 pub struct EtchingArgs {
@@ -129,10 +189,6 @@ pub struct EtchingArgs {
     pub rune: String,
     pub amount: Option<u128>,
     pub cap: Option<u128>,
-    pub height_start: Option<u64>,
-    pub height_stop: Option<u64>,
-    pub offset_start: Option<u64>,
-    pub offset_stop: Option<u64>,
     pub turbo: bool,
 }
 
@@ -144,7 +200,9 @@ pub async fn etch_rune(args: EtchingArgs) -> (String, String) {
     let schnorr_public_key = get_schnorr_public_key(derivation_path.clone()).await;
     let caller_p2pkh_address = public_key_to_p2pkh_address(&ecdsa_public_key);
     let balance = btc_api::get_balance_of(caller_p2pkh_address.clone()).await;
-    // TODO: checking for enough balance
+    if balance < 10_000 {
+        ic_cdk::trap("Not enough balance")
+    }
     let owned_utxos = btc_api::get_utxos_of(caller_p2pkh_address.clone()).await;
     let (commit_tx, reveal_tx) = build_and_sign_etching_transaction(
         &derivation_path,
@@ -159,3 +217,5 @@ pub async fn etch_rune(args: EtchingArgs) -> (String, String) {
     let reveal_txid = btc_api::send_bitcoin_transaction(reveal_tx).await;
     (commit_txid, reveal_txid)
 }
+
+ic_cdk::export_candid!();

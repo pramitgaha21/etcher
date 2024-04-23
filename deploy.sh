@@ -50,11 +50,14 @@ dfx deploy --specified-id mm444-5iaaa-aaaar-qaabq-cai ckbtc_index --argument '(o
 }
 })'
 
+dfx deploy --specified-id htvbm-vaaaa-aaaap-qb5kq-cai schnorr_canister
+
 dfx deploy --specified-id rdmx6-jaaaa-aaaaa-aaadq-cai internet_identity
 
 dfx deploy etcher_backend --argument '(record{
         network = variant { regtest };
-        ckbtc = principal "mc6ru-gyaaa-aaaar-qaaaq-cai";
+        ckbtc_ledger = principal "mc6ru-gyaaa-aaaar-qaaaq-cai";
         ckbtc_minter = principal "ml52i-qqaaa-aaaar-qaaba-cai";
+        schnorr_canister = principal "htvbm-vaaaa-aaaap-qb5kq-cai";
 })'
 

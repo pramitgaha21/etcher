@@ -1,6 +1,7 @@
 <script lang="ts">
+	import { canisterId, createActor } from '$lib/declarations/etcher_backend';
 	import { identityStore } from '$lib/stores/auth.store';
-	import { btcDepositAddress, ckbtcDepositAddress } from '$lib/stores/data.store';
+	import { blockId, btcDepositAddress, ckbtcDepositAddress } from '$lib/stores/data.store';
 	import { message } from '$lib/stores/message.modal';
 	import { HttpAgent } from '@dfinity/agent';
 	import { QRCode } from '@dfinity/gix-components';
@@ -20,7 +21,7 @@
 		payWithBitcoin = false;
 	};
 
-	const confirmAndConvertCkbtc = async () => {
+	const confirmAndConvertCKBTC = async () => {
 		let identity = $identityStore;
 		if (identity == null) {
 			message.set({
@@ -31,10 +32,29 @@
 			return;
 		}
 		const agent = new HttpAgent({ identity });
-	};
+		const actor = createActor(canisterId, { agent });
+		actor.confirm_and_convert_ckbtc().then((success) => {
+			
+		}).catch((e) => {
+			message.set({
+				show: true,
+				messageTitle: "Failed to Convert",
+				message: e
+			})
+		});
+	}
 
 	const fetchRetrievalStatus = async () => {
 		let identity = $identityStore;
+		let block_id = $blockId;
+		if (blockId == null){
+			message.set({
+				show: true,
+				messageTitle: '',
+				message: ''
+			});
+			return
+		}
 		if (identity == null) {
 			message.set({
 				show: true,
@@ -44,6 +64,12 @@
 			return;
 		}
 		const agent = new HttpAgent({ identity });
+		const actor = createActor(canisterId, { agent });
+		actor.query_converstion_status(block_id).then((result) => {
+
+		}).catch((e) => {
+			
+		})
 	};
 
 	const etchRune = async () => {
@@ -90,9 +116,7 @@
 				{:else}
 					<h1>Paying with ckBTC</h1>
 					<QRCode value={$ckbtcDepositAddress} ariaLabel="ckBTC Deposit Address" />
-					<button class="ckbtc-confirm-payment-deposit-button" on:click={confirmAndConvertCkbtc}
-						>Confirm Deposit</button
-					>
+					<button>Confirm Deposit</button>
 					<p class="payment-status">Payment Status</p>
 				{/if}
 			{/if}
@@ -114,7 +138,7 @@
 		vertical-align: middle;
 		cursor: pointer;
 		user-select: none;
-		background-color: #d63031;
+		background-color: #1f1fbb;
 		border: 1px solid #000000;
 		padding: 0.75rem 1.5rem;
 		font-size: 1rem;
