@@ -218,16 +218,10 @@ pub async fn build_and_sign_etching_transaction_v2(
         .collect::<Vec<_>>();
     let mut commit_tx = Transaction {
         input,
-        output: vec![
-            TxOut {
-                script_pubkey: runestone.encipher(),
-                value: 0,
-            },
-            TxOut {
-                script_pubkey: commit_tx_address.script_pubkey(),
-                value: total_spent,
-            },
-        ],
+        output: vec![TxOut {
+            script_pubkey: commit_tx_address.script_pubkey(),
+            value: total_spent,
+        }],
         lock_time: LockTime::ZERO,
         version: 2,
     };
@@ -261,10 +255,10 @@ pub async fn build_and_sign_etching_transaction_v2(
         txid: commit_tx.txid(),
         vout: vout as u32,
     };
-    reveal_output = vec![TxOut {
+    reveal_output.push(TxOut {
         value: 10_000,
         script_pubkey: caller_address.script_pubkey(),
-    }];
+    });
     // let (mut reveal_tx, _) = build_reveal_transaction(
     //     0,
     //     &control_block,
@@ -287,7 +281,7 @@ pub async fn build_and_sign_etching_transaction_v2(
         lock_time: LockTime::ZERO,
         version: 2,
     };
-    let prevouts = vec![commit_tx.output[vout].clone()];
+    // let prevouts = vec![commit_tx.output[vout].clone()];
     let mut sighhash_cache = SighashCache::new(&mut reveal_tx);
     let mut signing_data = vec![];
     let leaf_hash = TapLeafHash::from_script(&reveal_script, LeafVersion::TapScript);
@@ -295,9 +289,9 @@ pub async fn build_and_sign_etching_transaction_v2(
         .taproot_encode_signing_data_to(
             &mut signing_data,
             0,
-            &Prevouts::All(&prevouts),
+            &Prevouts::All(commit_tx.output.as_slice()),
             None,
-            Some((leaf_hash.into(), 0xFFFFFFFF)),
+            Some((leaf_hash, 0xFFFFFFFF)),
             TapSighashType::Default,
         )
         .unwrap();
@@ -332,7 +326,7 @@ pub async fn build_and_sign_etching_transaction_v2(
     );
     witness.push(reveal_script);
     witness.push(&control_block.serialize());
-    if Runestone::decipher(&commit_tx).unwrap() != Artifact::Runestone(runestone) {
+    if Runestone::decipher(&reveal_tx).unwrap() != Artifact::Runestone(runestone) {
         ic_cdk::trap("Runestone mismatched")
     }
     let reveal_tx_bytes = consensus::serialize(&reveal_tx);
