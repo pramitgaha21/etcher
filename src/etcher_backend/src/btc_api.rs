@@ -2,6 +2,7 @@ use std::str::FromStr;
 
 use bitcoin::{
     absolute::LockTime,
+    consensus,
     hashes::{sha256, Hash},
     opcodes,
     script::{Builder, PushBytes},
@@ -15,7 +16,7 @@ use bitcoin::{
 };
 use hex::ToHex;
 use ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Utxo};
-use ordinals::{Etching, Runestone, Terms};
+use ordinals::{Artifact, Etching, Runestone, Terms};
 
 use crate::{
     ecdsa_api::ecdsa_sign,
@@ -113,6 +114,212 @@ pub fn build_reveal_transaction(
     (reveal_txn, fee)
 }
 
+pub async fn build_and_sign_etching_transaction_v2(
+    derivation_path: &Vec<Vec<u8>>,
+    owned_utxos: &[Utxo],
+    ecdsa_public_key: &[u8],
+    schnorr_public_key: &[u8],
+    caller_p2pkh_address: String,
+    etching_args: EtchingArgs,
+) -> (Transaction, Transaction) {
+    let (rune, spacers) = string_to_rune_and_spacer(&etching_args.rune);
+    // Building the reveal script
+    let secp256k1 = Secp256k1::new();
+    let schnorr_public_key: XOnlyPublicKey =
+        PublicKey::from_slice(schnorr_public_key).unwrap().into();
+    let reveal_script = Builder::new()
+        .push_slice::<&PushBytes>(rune.commitment().as_slice().try_into().unwrap())
+        .push_slice(schnorr_public_key.serialize())
+        .push_opcode(opcodes::all::OP_CHECKSIG)
+        .into_script();
+
+    let taproot_send_info = TaprootBuilder::new()
+        .add_leaf(0, reveal_script.clone())
+        .unwrap()
+        .finalize(&secp256k1, schnorr_public_key)
+        .unwrap();
+    let control_block = taproot_send_info
+        .control_block(&(reveal_script.clone(), LeafVersion::TapScript))
+        .unwrap();
+    // convering address
+    let network = STATE.with_borrow(|state| {
+        let network = state.network.as_ref().unwrap();
+        match network {
+            BitcoinNetwork::Mainnet => Network::Bitcoin,
+            BitcoinNetwork::Testnet => Network::Testnet,
+            BitcoinNetwork::Regtest => Network::Regtest,
+        }
+    });
+    let caller_address = Address::from_str(&caller_p2pkh_address)
+        .unwrap()
+        .assume_checked();
+    let commit_tx_address = Address::p2tr_tweaked(taproot_send_info.output_key(), network);
+
+    let mut reveal_input = vec![OutPoint::null()];
+    let mut reveal_output = vec![];
+    let symbol = match etching_args.symbol {
+        None => None,
+        Some(symbol) => {
+            let symbol = char::from_u32(symbol).unwrap();
+            Some(symbol)
+        }
+    };
+
+    let runestone = Runestone {
+        edicts: vec![],
+        etching: Some(Etching {
+            divisibility: Some(etching_args.divisibility),
+            premine: None,
+            rune: Some(rune),
+            spacers: Some(spacers),
+            terms: Some(Terms {
+                amount: etching_args.amount,
+                cap: etching_args.cap,
+                height: (None, None),
+                offset: (None, None),
+            }),
+            symbol,
+            turbo: etching_args.turbo,
+        }),
+        pointer: None,
+        mint: None,
+    };
+    reveal_output.push(TxOut {
+        script_pubkey: runestone.encipher(),
+        value: 0,
+    });
+    let fee_rate = FeeRate::from_sat_per_vb(10).unwrap();
+    let (_, reveal_fee) = build_reveal_transaction(
+        0,
+        &control_block,
+        fee_rate,
+        reveal_output.clone(),
+        reveal_input.clone(),
+        &reveal_script,
+    );
+
+    let mut utxos_to_spend = vec![];
+    let mut total_spent = 0;
+    for utxo in owned_utxos.iter().rev() {
+        total_spent += utxo.value;
+        utxos_to_spend.push(utxo);
+    }
+    let input = utxos_to_spend
+        .into_iter()
+        .map(|utxo| TxIn {
+            previous_output: OutPoint {
+                txid: Txid::from_raw_hash(Hash::from_slice(&utxo.outpoint.txid).unwrap()),
+                vout: utxo.outpoint.vout,
+            },
+            sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
+            script_sig: ScriptBuf::new(),
+            witness: Witness::new(),
+        })
+        .collect::<Vec<_>>();
+    let mut commit_tx = Transaction {
+        input,
+        output: vec![TxOut {
+            script_pubkey: commit_tx_address.script_pubkey(),
+            value: total_spent,
+        }],
+        lock_time: LockTime::ZERO,
+        version: 2,
+    };
+
+    let sig_vbytes = 73;
+    let commit_fee =
+        FeeRate::from_sat_per_vb(fee_rate.to_sat_per_kwu() * commit_tx.vsize() as u64 + sig_vbytes)
+            .unwrap();
+
+    commit_tx.output[0].value = total_spent - commit_fee.to_sat_per_kwu();
+    let commit_tx_cache = SighashCache::new(commit_tx.clone());
+    for (i, input) in commit_tx.input.iter_mut().enumerate() {
+        let sighash = commit_tx_cache
+            .legacy_signature_hash(i, &caller_address.script_pubkey(), SIG_HASH_TYPE.to_u32())
+            .unwrap();
+        let signature = ecdsa_sign(sighash.to_byte_array().to_vec(), derivation_path.clone()).await;
+        let mut signature = sec1_to_der(signature);
+        signature.push(EcdsaSighashType::All.to_u32() as u8);
+        input.script_sig = ScriptBuf::builder()
+            .push_slice::<&PushBytes>(signature.as_slice().try_into().unwrap())
+            .push_slice::<&PushBytes>(ecdsa_public_key.try_into().unwrap())
+            .into_script();
+    }
+    let (vout, _commit_output) = commit_tx
+        .output
+        .iter()
+        .enumerate()
+        .find(|(_vout, output)| output.script_pubkey == commit_tx_address.script_pubkey())
+        .expect("should find sat commit/inscription output");
+    reveal_input[0] = OutPoint {
+        txid: commit_tx.txid(),
+        vout: vout as u32,
+    };
+    reveal_output.push(TxOut {
+        value: 10_000,
+        script_pubkey: caller_address.script_pubkey(),
+    });
+    let (mut reveal_tx, _) = build_reveal_transaction(
+        0,
+        &control_block,
+        fee_rate,
+        reveal_output.clone(),
+        reveal_input.clone(),
+        &reveal_script,
+    );
+    let prevouts = vec![commit_tx.output[vout].clone()];
+    let mut sighhash_cache = SighashCache::new(&mut reveal_tx);
+    let mut signing_data = vec![];
+    let leaf_hash = TapLeafHash::from_script(&reveal_script, LeafVersion::TapScript);
+    sighhash_cache
+        .taproot_encode_signing_data_to(
+            &mut signing_data,
+            0,
+            &Prevouts::All(&prevouts),
+            None,
+            Some((leaf_hash.into(), 0xFFFFFFFF)),
+            TapSighashType::Default,
+        )
+        .unwrap();
+    let tag = b"TapSighash";
+    let mut hashed_tag = sha256::Hash::hash(tag).to_byte_array().to_vec();
+    let mut prefix = hashed_tag.clone();
+
+    prefix.append(&mut hashed_tag);
+    let signing_data: Vec<_> = prefix.iter().chain(signing_data.iter()).cloned().collect();
+
+    let schnorr_signature =
+        schnorr_api::schnorr_sign(signing_data.clone(), derivation_path.clone()).await;
+
+    // Verify the signature to be sure that signing works
+    let secp = bitcoin::secp256k1::Secp256k1::verification_only();
+
+    let sig_ = schnorr::Signature::from_slice(&schnorr_signature).unwrap();
+
+    let digest = sha256::Hash::hash(&signing_data).to_byte_array();
+    let msg = Message::from_slice(&digest).unwrap();
+
+    assert!(secp
+        .verify_schnorr(&sig_, &msg, &schnorr_public_key)
+        .is_ok());
+    let witness = sighhash_cache.witness_mut(0).unwrap();
+    witness.push(
+        Signature {
+            sig: schnorr::Signature::from_slice(&schnorr_signature).unwrap(),
+            hash_ty: TapSighashType::Default,
+        }
+        .to_vec(),
+    );
+    witness.push(reveal_script);
+    witness.push(&control_block.serialize());
+    if Runestone::decipher(&reveal_tx).unwrap() != Artifact::Runestone(runestone) {
+        ic_cdk::trap("Runestone mismatched")
+    }
+    let reveal_tx_bytes = consensus::serialize(&reveal_tx);
+    ic_cdk::println!("Signed reveal txn: {}", hex::encode(reveal_tx_bytes));
+    (commit_tx, reveal_tx)
+}
+
 pub async fn build_and_sign_etching_transaction(
     derivation_path: &Vec<Vec<u8>>,
     owned_utxos: &[Utxo],
@@ -156,7 +363,7 @@ pub async fn build_and_sign_etching_transaction(
         ic_cdk::trap("Exceeds OP_RETURN size of 82")
     }
     reveal_output.push(TxOut {
-        script_pubkey,
+        script_pubkey: script_pubkey.clone(),
         value: 0,
     });
     let commit_input_index = 0;
@@ -224,9 +431,9 @@ pub async fn build_and_sign_etching_transaction(
                 txid: Txid::from_raw_hash(Hash::from_slice(&utxo.outpoint.txid).unwrap()),
                 vout: utxo.outpoint.vout,
             },
-            sequence: Sequence::from_height(Runestone::COMMIT_CONFIRMATIONS - 1),
+            sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
             witness: Witness::new(),
-            script_sig: Builder::new().into_script(),
+            script_sig: ScriptBuf::new(),
         })
         .collect();
     let mut commit_tx = Transaction {
@@ -283,18 +490,8 @@ pub async fn build_and_sign_etching_transaction(
         reveal_input,
         &reveal_script,
     );
-    // let prevouts = vec![commit_tx.output[vout].clone()];
     let leaf_hash = TapLeafHash::from_script(&reveal_script, LeafVersion::TapScript);
     let mut sighash_cache = SighashCache::new(&mut reveal_tx);
-    // let sighash = sighash_cache
-    //     .taproot_script_spend_signature_hash(
-    //         commit_input_index,
-    //         &Prevouts::All(&prevouts),
-    //         TapLeafHash::from_script(&reveal_script, LeafVersion::TapScript),
-    //         TapSighashType::Default,
-    //     )
-    //     .expect("Failed to taproot spend");
-    // let msg = sighash.to_byte_array().to_vec();
     let mut signing_data = vec![];
     sighash_cache
         .taproot_encode_signing_data_to(
@@ -305,7 +502,7 @@ pub async fn build_and_sign_etching_transaction(
             Some((leaf_hash, 0xFFFFFFFF)),
             TapSighashType::Default,
         )
-        .expect("Failed to sign data");
+        .unwrap();
     let tag = b"TapSighash";
     let mut hashed_tag = sha256::Hash::hash(tag).to_byte_array().to_vec();
     let mut prefix = hashed_tag.clone();
@@ -339,5 +536,10 @@ pub async fn build_and_sign_etching_transaction(
     );
     witness.push(reveal_script);
     witness.push(&control_block.serialize());
+    if Runestone::decipher(&reveal_tx).unwrap() != Artifact::Runestone(runestone) {
+        ic_cdk::trap("Runestone mismatched")
+    }
+    let reveal_tx_bytes = consensus::serialize(&reveal_tx);
+    ic_cdk::println!("Signed reveal txn: {}", hex::encode(reveal_tx_bytes));
     (commit_tx, reveal_tx)
 }

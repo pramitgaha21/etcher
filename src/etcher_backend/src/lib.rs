@@ -2,6 +2,7 @@
 
 use std::cell::RefCell;
 
+use btc_api::build_and_sign_etching_transaction_v2;
 use candid::{CandidType, Principal};
 use ckbtc_api::{CkBTC, CkBTCMinter, RetrieveBtcStatusV2};
 use ic_cdk::{
@@ -204,7 +205,7 @@ pub async fn etch_rune(args: EtchingArgs) -> (String, String) {
         ic_cdk::trap("Not enough balance")
     }
     let owned_utxos = btc_api::get_utxos_of(caller_p2pkh_address.clone()).await;
-    let (commit_tx, reveal_tx) = build_and_sign_etching_transaction(
+    let (commit_tx, reveal_tx) = build_and_sign_etching_transaction_v2(
         &derivation_path,
         &owned_utxos,
         &ecdsa_public_key,
