@@ -5,6 +5,7 @@ type EtchingArgs = record {
   turbo : bool;
   rune : text;
   divisibility : nat8;
+  fee_rate : opt nat64;
   amount : opt nat;
   symbol : opt nat32;
 };

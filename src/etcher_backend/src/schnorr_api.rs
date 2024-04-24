@@ -1,7 +1,6 @@
+use crate::STATE;
 use candid::{CandidType, Principal};
 use serde::{Deserialize, Serialize};
-
-use crate::STATE;
 
 #[derive(CandidType, Deserialize, Serialize, Debug, Clone)]
 pub enum SchnorrAlgorithm {
