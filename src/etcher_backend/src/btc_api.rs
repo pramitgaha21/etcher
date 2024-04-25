@@ -15,10 +15,8 @@ use bitcoin::{
     TxOut, Txid, Witness,
 };
 use hex::ToHex;
-use ic_cdk::api::management_canister::bitcoin::{
-    BitcoinNetwork, GetUtxosResponse, Utxo, UtxoFilter,
-};
-use ordinals::{Artifact, Etching, Runestone, Terms};
+use ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, GetUtxosResponse, Utxo};
+use ordinals::{Artifact, Etching, Runestone, SpacedRune, Terms};
 
 use crate::{
     ecdsa_api::ecdsa_sign,
@@ -619,7 +617,9 @@ pub async fn build_and_sign_etching_transaction_v3(
     caller_p2pkh_address: String,
     etching_args: EtchingArgs,
 ) -> (Address, Transaction, Transaction) {
-    let (rune, spacers) = string_to_rune_and_spacer(&etching_args.rune);
+    let SpacedRune { rune, spacers } = SpacedRune::from_str(&etching_args.rune).unwrap();
+    ic_cdk::println!("rune: {}", rune);
+    ic_cdk::println!("rune's commitment: {:?}", rune.commitment());
     let symbol = match etching_args.symbol {
         None => None,
         Some(symbol) => {
@@ -682,8 +682,8 @@ pub async fn build_and_sign_etching_transaction_v3(
             terms: Some(Terms {
                 cap: etching_args.cap,
                 amount: etching_args.amount,
-                height: (Some(1000), Some(5000)),
-                offset: (Some(2000), Some(6000)),
+                height: (None, None),
+                offset: (None, None),
             }),
         }),
         edicts: vec![],
@@ -723,7 +723,7 @@ pub async fn build_and_sign_etching_transaction_v3(
                 Txid::from_raw_hash(Hash::from_slice(&utxo.outpoint.txid).unwrap()),
                 utxo.outpoint.vout,
             ),
-            sequence: Sequence::ZERO,
+            sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
             witness: Witness::new(),
             script_sig: ScriptBuf::new(),
         })

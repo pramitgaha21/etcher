@@ -1,14 +1,7 @@
-use bitcoin::blockdata::{
-    opcodes,
-    script::{self, PushBytesBuf},
-};
+use bitcoin::blockdata::script;
 
 use std::{convert::TryInto, mem};
 
-use serde::{Deserialize, Serialize};
-
-const PROTOCOL_ID: [u8; 3] = *b"ord";
-const BODY_TAG: [u8; 0] = [];
 /// The maximum allowed script size.
 pub const MAX_SCRIPT_ELEMENT_SIZE: usize = 520;
 
