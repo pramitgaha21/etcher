@@ -15,12 +15,15 @@ use bitcoin::{
     TxOut, Txid, Witness,
 };
 use hex::ToHex;
-use ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Utxo, UtxoFilter};
+use ic_cdk::api::management_canister::bitcoin::{
+    BitcoinNetwork, GetUtxosResponse, Utxo, UtxoFilter,
+};
 use ordinals::{Artifact, Etching, Runestone, Terms};
 
 use crate::{
     ecdsa_api::ecdsa_sign,
     schnorr_api,
+    tags::Tag,
     utils::{sec1_to_der, string_to_rune_and_spacer},
     EtchingArgs, STATE,
 };
@@ -41,19 +44,18 @@ pub async fn get_balance_of(address: String) -> u64 {
     .0
 }
 
-pub async fn get_utxos_of(address: String, filter: Option<UtxoFilter>) -> Vec<Utxo> {
+pub async fn get_utxos_of(address: String) -> GetUtxosResponse {
     let network = STATE.with_borrow(|state| *state.network.as_ref().unwrap());
     ic_cdk::api::management_canister::bitcoin::bitcoin_get_utxos(
         ic_cdk::api::management_canister::bitcoin::GetUtxosRequest {
             address,
             network,
-            filter,
+            filter: None,
         },
     )
     .await
     .unwrap()
     .0
-    .utxos
 }
 
 pub async fn send_bitcoin_transaction(txn: Transaction) -> String {
@@ -629,10 +631,18 @@ pub async fn build_and_sign_etching_transaction_v3(
     let secp256k1 = Secp256k1::new();
     let schnorr_public_key: XOnlyPublicKey =
         PublicKey::from_slice(schnorr_public_key).unwrap().into();
-    let reveal_script = Builder::new()
-        .push_slice::<&PushBytes>(rune.commitment().as_slice().try_into().unwrap())
+    const PROTOCOL_ID: [u8; 3] = *b"ord";
+    let mut reveal_script = Builder::new()
         .push_slice(schnorr_public_key.serialize())
         .push_opcode(opcodes::all::OP_CHECKSIG)
+        .push_opcode(opcodes::OP_FALSE)
+        .push_opcode(opcodes::all::OP_IF)
+        .push_slice(PROTOCOL_ID);
+
+    Tag::Rune.encode(&mut reveal_script, &Some(rune.commitment()));
+
+    let reveal_script = reveal_script
+        .push_opcode(opcodes::all::OP_ENDIF)
         .into_script();
 
     let taproot_send_info = TaprootBuilder::new()
@@ -672,11 +682,13 @@ pub async fn build_and_sign_etching_transaction_v3(
             terms: Some(Terms {
                 cap: etching_args.cap,
                 amount: etching_args.amount,
-                height: (None, None),
-                offset: (None, None),
+                height: (Some(1000), Some(5000)),
+                offset: (Some(2000), Some(6000)),
             }),
         }),
-        ..Default::default()
+        edicts: vec![],
+        mint: None,
+        pointer: None,
     };
 
     let script_pubkey = runestone.encipher();
@@ -778,8 +790,7 @@ pub async fn build_and_sign_etching_transaction_v3(
                 previous_output: *outpoint,
                 witness: Witness::new(),
                 script_sig: ScriptBuf::new(),
-                // sequence: Sequence::from_height(Runestone::COMMIT_CONFIRMATIONS - 1),
-                sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
+                sequence: Sequence::from_height(Runestone::COMMIT_CONFIRMATIONS - 1),
             })
             .collect(),
         output: reveal_output,
@@ -798,7 +809,8 @@ pub async fn build_and_sign_etching_transaction_v3(
         .taproot_encode_signing_data_to(
             &mut signing_data,
             0,
-            &Prevouts::All(commit_tx.output.as_slice()),
+            // &Prevouts::All(commit_tx.output.as_slice()),
+            &Prevouts::All(&[commit_tx.output[vout].clone()]),
             None,
             Some((leaf_hash, 0xFFFFFFFF)),
             TapSighashType::Default,
@@ -812,6 +824,7 @@ pub async fn build_and_sign_etching_transaction_v3(
 
     let schnorr_signature =
         schnorr_api::schnorr_sign(signing_data.clone(), derivation_path.clone()).await;
+    ic_cdk::println!("sig size: {}", schnorr_signature.len());
 
     // Verify the signature to be sure that signing works
     let secp = bitcoin::secp256k1::Secp256k1::verification_only();

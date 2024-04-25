@@ -9,12 +9,19 @@ type EtchingArgs = record {
   amount : opt nat;
   symbol : opt nat32;
 };
+type GetUtxosResponse = record {
+  next_page : opt blob;
+  tip_height : nat32;
+  tip_block_hash : blob;
+  utxos : vec Utxo;
+};
 type InitArgs = record {
   network : BitcoinNetwork;
   ckbtc_minter : principal;
   schnorr_canister : principal;
   ckbtc_ledger : principal;
 };
+type Outpoint = record { txid : blob; vout : nat32 };
 type ReimbursementDeposit = record {
   account : Account;
   mint_block_index : nat64;
@@ -36,11 +43,14 @@ type RetrieveBtcStatusV2 = variant {
   Reimbursed : ReimbursementDeposit;
   Pending;
 };
+type Utxo = record { height : nat32; value : nat64; outpoint : Outpoint };
 service : (InitArgs) -> {
   confirm_and_convert_ckbtc : () -> (nat64);
   etch_rune : (EtchingArgs) -> (text, text);
   get_btc_balance : () -> (nat64);
   get_deposit_address_for_bitcoin : () -> (text);
   get_deposit_address_for_ckbtc : () -> (text) query;
+  get_reveal_txn_count : () -> (nat32) query;
+  get_utxo_with_confirmation : (text) -> (GetUtxosResponse);
   query_converstion_status : (nat64) -> (RetrieveBtcStatusV2) composite_query;
 }

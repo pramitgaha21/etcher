@@ -6,7 +6,14 @@
 bitcoind
 candid-extractor
 
-##### Follow the Guide to start the `bitcoind` for `regtest` [link](https://internetcomputer.org/docs/current/developer-docs/multi-chain/bitcoin/using-btc/local-development)
+Running the docker
+```bash
+# for linux users
+./init.sh
+
+# for mac users
+DOCKER_DEFAULT_PLATFORM=linux/amd64 ./init.sh
+```
 
 ```bash
 # Optional Step

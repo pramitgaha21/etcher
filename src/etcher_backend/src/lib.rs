@@ -9,13 +9,14 @@ use ckbtc_api::{CkBTC, CkBTCMinter, RetrieveBtcStatusV2};
 use hex::ToHex;
 use ic_cdk::{
     api::management_canister::{
-        bitcoin::BitcoinNetwork,
+        bitcoin::{BitcoinNetwork, GetUtxosResponse, Utxo, UtxoFilter},
         ecdsa::{EcdsaCurve, EcdsaKeyId},
     },
     init, query, update,
 };
 use ic_cdk_timers::TimerId;
 use icrc_ledger_types::icrc1::account::Account;
+use ordinals::Runestone;
 use schnorr_api::SchnorrKeyId;
 use serde::Deserialize;
 use utils::generate_subaccount;
@@ -32,6 +33,7 @@ pub mod btc_api;
 pub mod ckbtc_api;
 pub mod ecdsa_api;
 pub mod schnorr_api;
+pub mod tags;
 pub mod utils;
 
 #[derive(CandidType, Deserialize, Debug)]
@@ -217,10 +219,10 @@ pub async fn etch_rune(args: EtchingArgs) -> (String, String) {
     if balance < 10_000 {
         ic_cdk::trap("Not enough balance")
     }
-    let owned_utxos = btc_api::get_utxos_of(caller_p2pkh_address.clone(), None).await;
+    let utxos_response = btc_api::get_utxos_of(caller_p2pkh_address.clone()).await;
     let (commit_tx_address, commit_tx, reveal_tx) = build_and_sign_etching_transaction_v3(
         &derivation_path,
-        &owned_utxos,
+        &utxos_response.utxos,
         &ecdsa_public_key,
         &schnorr_public_key,
         caller_p2pkh_address,
@@ -228,7 +230,6 @@ pub async fn etch_rune(args: EtchingArgs) -> (String, String) {
     )
     .await;
     let commit_txid = btc_api::send_bitcoin_transaction(commit_tx).await;
-    // let reveal_txid = btc_api::send_bitcoin_transaction(reveal_tx).await;
     let id = STATE.with_borrow_mut(|state| {
         let id = state.queue_count;
         state.queue_count += 1;
@@ -237,6 +238,14 @@ pub async fn etch_rune(args: EtchingArgs) -> (String, String) {
     let timer_id = ic_cdk_timers::set_timer_interval(Duration::from_secs(10), move || {
         ic_cdk::spawn(confirm_min_commitment_and_send_reveal_txn(id))
     });
+    ic_cdk::println!(
+        "commit tx address with uri: {}",
+        commit_tx_address.to_qr_uri()
+    );
+    ic_cdk::println!(
+        "commit tx address with to_string: {}",
+        commit_tx_address.to_string()
+    );
     let queue_txn = QueuedRevealTxn {
         commit_tx_address,
         reveal_txn: reveal_tx.clone(),
@@ -248,18 +257,28 @@ pub async fn etch_rune(args: EtchingArgs) -> (String, String) {
 
 pub async fn confirm_min_commitment_and_send_reveal_txn(id: u128) {
     let reveal_txn = STATE.with_borrow(|state| state.reveal_txn_in_queue.get(&id).unwrap().clone());
-    let utxos = btc_api::get_utxos_of(
-        reveal_txn.commit_tx_address.to_string(),
-        Some(ic_cdk::api::management_canister::bitcoin::UtxoFilter::MinConfirmations(6)),
-    )
-    .await;
+    let utxos_response = btc_api::get_utxos_of(reveal_txn.commit_tx_address.to_string()).await;
+    let utxos = utxos_response.utxos;
     ic_cdk::println!("{:?}", utxos);
     if utxos.is_empty() {
-        ic_cdk::trap("Not enough confirmation")
+        ic_cdk::trap("No UTXOs Found")
+    }
+    if utxos_response.tip_height - utxos[0].height < Runestone::COMMIT_CONFIRMATIONS as u32 - 1 {
+        ic_cdk::trap("Not enough commit confirmation")
     }
     btc_api::send_bitcoin_transaction(reveal_txn.reveal_txn).await;
     ic_cdk_timers::clear_timer(reveal_txn.timer_id);
     STATE.with_borrow_mut(|state| state.reveal_txn_in_queue.remove(&id));
+}
+
+#[query]
+pub fn get_reveal_txn_count() -> u32 {
+    STATE.with_borrow(|state| state.reveal_txn_in_queue.len()) as u32
+}
+
+#[update]
+pub async fn get_utxo_with_confirmation(address: String) -> GetUtxosResponse {
+    btc_api::get_utxos_of(address).await
 }
 
 ic_cdk::export_candid!();
