@@ -1,7 +1,6 @@
 use candid::Principal;
 use ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use icrc_ledger_types::icrc1::account::Subaccount;
-use ordinals::Rune;
 use sha2::Digest;
 use tiny_keccak::{Hasher, Sha3};
 
@@ -106,20 +105,4 @@ pub fn sec1_to_der(sec1_signature: Vec<u8>) -> Vec<u8> {
     .into_iter()
     .flatten()
     .collect()
-}
-
-pub fn string_to_rune_and_spacer(word: &str) -> (Rune, u32) {
-    let mut rune = 0;
-    let mut spacer = 0u32;
-    let mut space_count = 0;
-    for (i, c) in word.chars().rev().enumerate() {
-        if c == ' ' {
-            space_count += 1;
-            // TODO: updating the spacer
-            continue;
-        }
-        rune += (c as u128 - 64) * 26_u128.pow((i - space_count) as u32);
-        // TODO: updating the spacer
-    }
-    (Rune(rune - 1), spacer)
 }

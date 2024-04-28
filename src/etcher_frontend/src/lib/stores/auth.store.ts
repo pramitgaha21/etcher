@@ -8,18 +8,25 @@ export const identityStore = writable<OptionalIdentity>(null);
 
 const isLocalNetwork = true;
 const identityProviderUrl = isLocalNetwork
-	? `http://${'rdmx6-jaaaa-aaaaa-aaadq-cai'}.localhost:4943`
-	: 'https://identity.ic0.app/';
+        ? `http://${'rdmx6-jaaaa-aaaaa-aaadq-cai'}.localhost:4943`
+        : 'https://identity.ic0.app/';
 
 export const connectII = async () => {
-	const authClient = await AuthClient.create();
-	const AUTH_MAX_TIME_TO_LIVE = BigInt(60 * 60 * 1000 * 1000 * 1000);
+        const authClient = await AuthClient.create();
 
-	authClient.login({
-		identityProvider: identityProviderUrl,
-		maxTimeToLive: AUTH_MAX_TIME_TO_LIVE,
-		onSuccess: () => {
-            identityStore.set(authClient.getIdentity())
-        }
-	});
+        const AUTH_MAX_TIME_TO_LIVE = BigInt(60 * 60 * 1000 * 1000 * 1000);
+
+        return new Promise((resolve, reject) => {
+                authClient.login({
+                        identityProvider: identityProviderUrl,
+                        maxTimeToLive: AUTH_MAX_TIME_TO_LIVE,
+                        onSuccess: () => {
+                                identityStore.set(authClient.getIdentity());
+                                resolve();
+                        },
+                        onFailure: (error) => {
+                                reject(error);
+                        },
+                });
+        });
 };

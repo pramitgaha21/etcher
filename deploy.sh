@@ -7,7 +7,7 @@ dfx deploy --specified-id ml52i-qqaaa-aaaar-qaaba-cai ckbtc_minter --argument '(
                 ecdsa_key_name = "dfx_test_key";
                 retrieve_btc_min_amount = 10_000;
                 max_time_in_queue_nanos = 420_000_000_000;
-                min_confirmations = opt 12;
+                min_confirmations = opt 1;
                 mode = variant { GeneralAvailability };
                 kyt_fee = opt 1_333;
                 kyt_principal = opt principal "pvm5g-xaaaa-aaaar-qaaia-cai"                
@@ -38,8 +38,9 @@ dfx deploy --specified-id mc6ru-gyaaa-aaaar-qaaaq-cai ckbtc_ledger --argument '(
 
 dfx deploy --specified-id pvm5g-xaaaa-aaaar-qaaia-cai ckbtc_kyt --argument '(variant{
         InitArg = record {
+                api_key = "";
                 minter_id = principal "ml52i-qqaaa-aaaar-qaaba-cai";
-                maintainers = vec {};
+                maintainers = vec {principal "'$PRINCIPAL'" };
                 mode = variant { AcceptAll };
 }
 })'
@@ -50,14 +51,16 @@ dfx deploy --specified-id mm444-5iaaa-aaaar-qaabq-cai ckbtc_index --argument '(o
 }
 })'
 
-dfx deploy --specified-id htvbm-vaaaa-aaaap-qb5kq-cai schnorr_canister
+dfx deploy --specified-id 6fwhw-fyaaa-aaaap-qb7ua-cai schnorr_canister
 
 dfx deploy --specified-id rdmx6-jaaaa-aaaaa-aaadq-cai internet_identity
 
-dfx deploy etcher_backend --argument '(record{
+dfx deploy etcher_backend --specified-id pvxnv-ciaaa-aaaag-qjunq-cai --argument '(record{
         network = variant { regtest };
         ckbtc_ledger = principal "mc6ru-gyaaa-aaaar-qaaaq-cai";
         ckbtc_minter = principal "ml52i-qqaaa-aaaar-qaaba-cai";
-        schnorr_canister = principal "htvbm-vaaaa-aaaap-qb5kq-cai";
+        schnorr_canister = principal "6fwhw-fyaaa-aaaap-qb7ua-cai";
+        timer_for_reveal_txn = 1;
 })'
 
+dfx deploy --specified-id kho2y-sqaaa-aaaag-qjuta-cai etcher_frontend

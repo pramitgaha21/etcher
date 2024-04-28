@@ -18,9 +18,9 @@ DOCKER_DEFAULT_PLATFORM=linux/amd64 ./init.sh
 ```bash
 # Optional Step
 chmod +x gen_candid.sh
-./gen_candid.sh # Generates the candid file
+./gen_candid_and_wasm.sh # Generates the candid file
 
-dfx start --clean # run the localhost in a different terminal
+dfx start --clean # run the localhost in a different screen
 
 chmod +x deploy.sh
 ./deploy.sh # Deploys all the canisters

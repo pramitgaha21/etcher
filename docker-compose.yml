@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   bitcoind:
     container_name: bitcoind
@@ -19,7 +18,7 @@ services:
     build:
       context: .
       dockerfile: ./docker/Dockerfile
-    command:  ["--regtest", "--bitcoin-data-dir", "/index-data", "--bitcoin-rpc-url", "bitcoind:18443", "server", "--http-port", "8080"]
+    command:  ["--regtest", "--bitcoin-data-dir", "/index-data", "--bitcoin-rpc-url", "bitcoind:18443", "--index-runes", "server", "--http-port", "8080"]
     volumes:
       - index_data:/index-data
     environment:

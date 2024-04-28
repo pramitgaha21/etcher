@@ -6,9 +6,9 @@ use std::{convert::TryInto, mem};
 pub const MAX_SCRIPT_ELEMENT_SIZE: usize = 520;
 
 #[derive(Copy, Clone)]
+#[allow(unused)]
 pub(crate) enum Tag {
     Pointer = 2,
-    #[allow(unused)]
     Unbound = 66,
 
     ContentType = 1,
@@ -18,9 +18,7 @@ pub(crate) enum Tag {
     ContentEncoding = 9,
     Delegate = 11,
     Rune = 13,
-    #[allow(unused)]
     Note = 15,
-    #[allow(unused)]
     Nop = 255,
 }
 

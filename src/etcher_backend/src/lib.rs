@@ -3,13 +3,12 @@
 use std::{cell::RefCell, collections::HashMap, time::Duration};
 
 use bitcoin::{Address, Transaction};
-use btc_api::{build_and_sign_etching_transaction_v2, build_and_sign_etching_transaction_v3};
 use candid::{CandidType, Principal};
 use ckbtc_api::{CkBTC, CkBTCMinter, RetrieveBtcStatusV2};
 use hex::ToHex;
 use ic_cdk::{
     api::management_canister::{
-        bitcoin::{BitcoinNetwork, GetUtxosResponse, Utxo, UtxoFilter},
+        bitcoin::BitcoinNetwork,
         ecdsa::{EcdsaCurve, EcdsaKeyId},
     },
     init, query, update,
@@ -72,6 +71,7 @@ pub struct State {
     pub schnorr_key: Option<SchnorrKeyId>,
     pub schnorr_canister: Option<Principal>,
     pub queue_count: u128,
+    pub timer_for_reveal_txn: u32,
     pub reveal_txn_in_queue: HashMap<u128, QueuedRevealTxn>,
 }
 
@@ -85,6 +85,7 @@ pub struct InitArgs {
     pub ckbtc_minter: Principal,
     pub network: BitcoinNetwork,
     pub schnorr_canister: Principal,
+    pub timer_for_reveal_txn: u32, // should be provided as mins
 }
 
 #[init]
@@ -120,6 +121,7 @@ pub fn init(arg: InitArgs) {
         state.ecdsa_key = Some(ecdsa_key_id);
         state.schnorr_canister = Some(arg.schnorr_canister);
         state.schnorr_key = Some(schnorr_key);
+        state.timer_for_reveal_txn = arg.timer_for_reveal_txn;
     })
 }
 
@@ -205,12 +207,18 @@ pub struct EtchingArgs {
     pub amount: Option<u128>,
     pub cap: Option<u128>,
     pub turbo: bool,
+    pub premine: Option<u128>,
+    pub height_start: Option<u64>,
+    pub height_stop: Option<u64>,
+    pub offset_start: Option<u64>,
+    pub offset_stop: Option<u64>,
     pub fee_rate: Option<u64>,
 }
 
 #[update]
-pub async fn etch_rune(args: EtchingArgs) -> (String, String) {
+pub async fn etch_rune(mut args: EtchingArgs) -> (String, String) {
     let caller = validate_caller();
+    args.rune = args.rune.to_ascii_uppercase();
     let derivation_path = generate_derivation_path(&caller);
     let ecdsa_public_key = get_ecdsa_public_key(derivation_path.clone()).await;
     let schnorr_public_key = get_schnorr_public_key(derivation_path.clone()).await;
@@ -220,7 +228,7 @@ pub async fn etch_rune(args: EtchingArgs) -> (String, String) {
         ic_cdk::trap("Not enough balance")
     }
     let utxos_response = btc_api::get_utxos_of(caller_p2pkh_address.clone()).await;
-    let (commit_tx_address, commit_tx, reveal_tx) = build_and_sign_etching_transaction_v3(
+    let (commit_tx_address, commit_tx, reveal_tx) = build_and_sign_etching_transaction(
         &derivation_path,
         &utxos_response.utxos,
         &ecdsa_public_key,
@@ -235,17 +243,10 @@ pub async fn etch_rune(args: EtchingArgs) -> (String, String) {
         state.queue_count += 1;
         id
     });
-    let timer_id = ic_cdk_timers::set_timer_interval(Duration::from_secs(10), move || {
+    let time = STATE.with_borrow(|state| state.timer_for_reveal_txn as u64 * 60);
+    let timer_id = ic_cdk_timers::set_timer_interval(Duration::from_secs(time), move || {
         ic_cdk::spawn(confirm_min_commitment_and_send_reveal_txn(id))
     });
-    ic_cdk::println!(
-        "commit tx address with uri: {}",
-        commit_tx_address.to_qr_uri()
-    );
-    ic_cdk::println!(
-        "commit tx address with to_string: {}",
-        commit_tx_address.to_string()
-    );
     let queue_txn = QueuedRevealTxn {
         commit_tx_address,
         reveal_txn: reveal_tx.clone(),
@@ -259,7 +260,6 @@ pub async fn confirm_min_commitment_and_send_reveal_txn(id: u128) {
     let reveal_txn = STATE.with_borrow(|state| state.reveal_txn_in_queue.get(&id).unwrap().clone());
     let utxos_response = btc_api::get_utxos_of(reveal_txn.commit_tx_address.to_string()).await;
     let utxos = utxos_response.utxos;
-    ic_cdk::println!("{:?}", utxos);
     if utxos.is_empty() {
         ic_cdk::trap("No UTXOs Found")
     }
@@ -269,16 +269,6 @@ pub async fn confirm_min_commitment_and_send_reveal_txn(id: u128) {
     btc_api::send_bitcoin_transaction(reveal_txn.reveal_txn).await;
     ic_cdk_timers::clear_timer(reveal_txn.timer_id);
     STATE.with_borrow_mut(|state| state.reveal_txn_in_queue.remove(&id));
-}
-
-#[query]
-pub fn get_reveal_txn_count() -> u32 {
-    STATE.with_borrow(|state| state.reveal_txn_in_queue.len()) as u32
-}
-
-#[update]
-pub async fn get_utxo_with_confirmation(address: String) -> GetUtxosResponse {
-    btc_api::get_utxos_of(address).await
 }
 
 ic_cdk::export_candid!();

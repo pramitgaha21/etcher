@@ -1,16 +1,20 @@
 <script lang="ts">
-	import EtchingModal from '$lib/components/EtchingModal.svelte';
-	import { identityStore } from '$lib/stores/auth.store';
+	import Etcher from '$lib/components/Etcher.svelte';
+	import ShowBitcoinBalance from '$lib/components/ShowBitcoinBalance.svelte';
 </script>
 
-<main>
-	<h1 class="title">Etcher</h1>
-	<h1 class="welcome-tag">Welcome User {$identityStore?.getPrincipal()}</h1>
-	<EtchingModal />
+<main class="page">
+	<ShowBitcoinBalance />
+	<Etcher />
 </main>
 
 <style>
-	.title {
-		font-size: 8rem;
+	.page {
+		margin-top: 2rem;
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		align-items: center;
+		min-height: 100vh;
 	}
 </style>

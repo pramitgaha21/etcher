@@ -29,8 +29,8 @@
       "declarations": {
         "node_compatibility": true
       },
-      "package": "etcher_backend",
-      "type": "rust"
+      "type": "custom",
+      "wasm": "wasm_files/etcher_backend.wasm"
     },
     "schnorr_canister": {
       "type": "custom",
@@ -38,7 +38,6 @@
       "wasm": "https://github.com/domwoe/schnorr_canister/releases/latest/download/schnorr_canister.wasm.gz"
     },
     "etcher_frontend": {
-      "dependencies": ["etcher_backend"],
       "source": ["src/etcher_frontend/dist"],
       "type": "assets",
       "workspace": "etcher_frontend"

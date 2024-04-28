@@ -4,6 +4,6 @@ export const btcDepositAddress = writable("");
 
 export const ckbtcDepositAddress = writable("");
 
-export type BlockId = number | null;
+export type BlockId = bigint | null;
 
 export const blockId = writable<BlockId>(null);

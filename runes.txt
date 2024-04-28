@@ -1,0 +1,56 @@
+{
+  "inscriptions": [
+    {
+      "input": 0,
+      "offset": 0,
+      "payload": {
+        "body": null,
+        "content_encoding": null,
+        "content_type": null,
+        "delegate": null,
+        "duplicate_field": false,
+        "incomplete_field": false,
+        "metadata": null,
+        "metaprotocol": null,
+        "parents": [],
+        "pointer": null,
+        "rune": [
+          106,
+          32,
+          167,
+          84
+        ],
+        "unrecognized_even_field": false
+      },
+      "pushnum": false,
+      "stutter": false
+    }
+  ],
+  "runestone": {
+    "Runestone": {
+      "edicts": [],
+      "etching": {
+        "divisibility": 2,
+        "premine": null,
+        "rune": "DOMWOEE",
+        "spacers": 4,
+        "symbol": "A",
+        "terms": {
+          "amount": 100,
+          "cap": 10000,
+          "height": [
+            null,
+            null
+          ],
+          "offset": [
+            null,
+            null
+          ]
+        },
+        "turbo": true
+      },
+      "mint": null,
+      "pointer": null
+    }
+  }
+}

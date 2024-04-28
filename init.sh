@@ -1,5 +1,5 @@
 #!/bin/bash
-#
+
 # Start bitcoind 
 docker compose up bitcoind -d
 sleep 2
