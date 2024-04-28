@@ -1,8 +1,8 @@
 # Etcher
 
 # TODO
-[] Payment using CkBTC
-[] Restricting Etching of runestone based on block number
+[ ] Payment using CkBTC
+[ ] Restricting Etching of runestone based on block number
 
 ### Deployment Guide
 
@@ -29,16 +29,3 @@ dfx start --clean # run the localhost in a different screen
 chmod +x deploy.sh
 ./deploy.sh # Deploys all the canisters
 ```
-
-dfx canister call etcher_backend etch_rune '(record{
-cap= null;
-offset_stop= null;
-height_stop=null;
-height_start=null;
-offset_start=null;
-turbo=true;
-divisibility=2;
-rune="AA";
-amount=null;
-symbol=null;
-})'
