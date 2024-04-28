@@ -1,5 +1,9 @@
 # Etcher
 
+# TODO
+[] Payment using CkBTC
+[] Restricting Etching of runestone based on block number
+
 ### Deployment Guide
 
 #### Pre-requisites
