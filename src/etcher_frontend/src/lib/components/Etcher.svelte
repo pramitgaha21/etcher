@@ -12,6 +12,7 @@
 	import { Input } from './ui/input';
 	import Login from './Login.svelte';
 	import { Layout } from '@dfinity/gix-components';
+	import MessageModal from './MessageModal.svelte';
 
 	let payWithBtc = true;
 	let premineFlag = false;
@@ -83,6 +84,11 @@
 			.etch_rune(arg)
 			.then((result) => {
 				console.log(result);
+				message.set({
+					show: true,
+					messageTitle: 'Succesfully submitted the Commit Transaction',
+					message: ''
+				});
 				return;
 			})
 			.catch((e) => {

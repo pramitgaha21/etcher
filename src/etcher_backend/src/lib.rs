@@ -3,6 +3,7 @@
 use std::{cell::RefCell, collections::HashMap, time::Duration};
 
 use bitcoin::{Address, Transaction};
+use btc_api::check_etching;
 use candid::{CandidType, Principal};
 use ckbtc_api::{CkBTC, CkBTCMinter, RetrieveBtcStatusV2};
 use hex::ToHex;
@@ -202,16 +203,16 @@ pub async fn query_converstion_status(block_index: u64) -> RetrieveBtcStatusV2 {
 #[derive(CandidType, Deserialize, Debug)]
 pub struct EtchingArgs {
     pub divisibility: u8,
-    pub symbol: Option<u32>,
+    pub symbol: u32,
     pub rune: String,
-    pub amount: Option<u128>,
-    pub cap: Option<u128>,
+    pub amount: u128,
+    pub cap: u128,
     pub turbo: bool,
     pub premine: Option<u128>,
-    pub height_start: Option<u64>,
-    pub height_stop: Option<u64>,
-    pub offset_start: Option<u64>,
-    pub offset_stop: Option<u64>,
+    pub height_start: u64,
+    pub height_stop: u64,
+    pub offset_start: u64,
+    pub offset_stop: u64,
     pub fee_rate: Option<u64>,
 }
 
@@ -228,6 +229,7 @@ pub async fn etch_rune(mut args: EtchingArgs) -> (String, String) {
         ic_cdk::trap("Not enough balance")
     }
     let utxos_response = btc_api::get_utxos_of(caller_p2pkh_address.clone()).await;
+    check_etching(utxos_response.tip_height, &args);
     let (commit_tx_address, commit_tx, reveal_tx) = build_and_sign_etching_transaction(
         &derivation_path,
         &utxos_response.utxos,

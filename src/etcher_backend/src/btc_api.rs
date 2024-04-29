@@ -16,7 +16,7 @@ use bitcoin::{
 };
 use hex::ToHex;
 use ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, GetUtxosResponse, Utxo};
-use ordinals::{Artifact, Etching, Runestone, SpacedRune, Terms};
+use ordinals::{Artifact, Etching, Rune, Runestone, SpacedRune, Terms};
 
 use crate::{
     ecdsa_api::ecdsa_sign, schnorr_api, tags::Tag, utils::sec1_to_der, EtchingArgs, STATE,
@@ -110,6 +110,37 @@ pub fn build_reveal_transaction(
     (reveal_txn, fee)
 }
 
+pub fn check_etching(height: u32, arg: &EtchingArgs) {
+    let network = STATE.with_borrow(|state| match state.network.as_ref().unwrap() {
+        BitcoinNetwork::Mainnet => Network::Bitcoin,
+        BitcoinNetwork::Testnet => Network::Testnet,
+        BitcoinNetwork::Regtest => Network::Regtest,
+    });
+    let minimum = Rune::minimum_at_height(network, ordinals::Height(height));
+    let SpacedRune { rune, spacers: _ } = SpacedRune::from_str(&arg.rune).unwrap();
+    if rune < minimum {
+        ic_cdk::trap("Rune is less than Minimum")
+    }
+    if !rune.is_reserved() {
+        ic_cdk::trap("Rune is reserved")
+    }
+    if char::from_u32(arg.symbol).is_none() {
+        ic_cdk::trap("Failed to validate symbol")
+    }
+    if arg.amount == 0 || arg.cap == 0 {
+        ic_cdk::trap("Can't be Zero")
+    }
+    if arg.divisibility > 38 {
+        ic_cdk::trap("Exceeds max allowed divisibility")
+    }
+    if arg.offset_stop < arg.offset_start {
+        ic_cdk::trap("Offet End must be greater than Offset Start")
+    }
+    if arg.height_stop < arg.height_start {
+        ic_cdk::trap("Height End must be greater then Height Start")
+    }
+}
+
 pub async fn build_and_sign_etching_transaction(
     derivation_path: &Vec<Vec<u8>>,
     owned_utxos: &[Utxo],
@@ -119,15 +150,7 @@ pub async fn build_and_sign_etching_transaction(
     etching_args: EtchingArgs,
 ) -> (Address, Transaction, Transaction) {
     let SpacedRune { rune, spacers } = SpacedRune::from_str(&etching_args.rune).unwrap();
-    ic_cdk::println!("rune: {}", rune);
-    ic_cdk::println!("rune's commitment: {:?}", rune.commitment());
-    let symbol = match etching_args.symbol {
-        None => None,
-        Some(symbol) => {
-            let symbol = char::from_u32(symbol).unwrap();
-            Some(symbol)
-        }
-    };
+    let symbol = char::from_u32(etching_args.symbol).unwrap();
     // building the reveal script
     let secp256k1 = Secp256k1::new();
     let schnorr_public_key: XOnlyPublicKey =
@@ -183,16 +206,22 @@ pub async fn build_and_sign_etching_transaction(
     let runestone = Runestone {
         etching: Some(Etching {
             rune: Some(rune),
-            symbol,
+            symbol: Some(symbol),
             divisibility: Some(etching_args.divisibility),
             premine: etching_args.premine,
             spacers: Some(spacers),
             turbo: etching_args.turbo,
             terms: Some(Terms {
-                cap: etching_args.cap,
-                amount: etching_args.amount,
-                height: (etching_args.height_start, etching_args.height_stop),
-                offset: (etching_args.offset_start, etching_args.offset_stop),
+                cap: Some(etching_args.cap),
+                amount: Some(etching_args.amount),
+                height: (
+                    Some(etching_args.height_start),
+                    Some(etching_args.height_stop),
+                ),
+                offset: (
+                    Some(etching_args.offset_start),
+                    Some(etching_args.offset_stop),
+                ),
             }),
         }),
         edicts: vec![],

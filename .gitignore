@@ -2,6 +2,7 @@
 .vscode/
 .idea/
 **/*~
+wasm_files
 
 # Mac OSX temporary files
 .DS_Store

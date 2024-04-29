@@ -1,18 +1,18 @@
 type Account = record { owner : principal; subaccount : opt blob };
 type BitcoinNetwork = variant { mainnet; regtest; testnet };
 type EtchingArgs = record {
-  cap : opt nat;
-  offset_stop : opt nat64;
-  height_stop : opt nat64;
+  cap : nat;
+  offset_stop : nat64;
+  height_stop : nat64;
   turbo : bool;
-  offset_start : opt nat64;
+  offset_start : nat64;
   premine : opt nat;
   rune : text;
   divisibility : nat8;
   fee_rate : opt nat64;
-  amount : opt nat;
-  height_start : opt nat64;
-  symbol : opt nat32;
+  amount : nat;
+  height_start : nat64;
+  symbol : nat32;
 };
 type InitArgs = record {
   network : BitcoinNetwork;
