@@ -55,7 +55,7 @@ dfx deploy --specified-id 6fwhw-fyaaa-aaaap-qb7ua-cai schnorr_canister
 
 dfx deploy --specified-id rdmx6-jaaaa-aaaaa-aaadq-cai internet_identity
 
-dfx deploy etcher_backend --specified-id pvxnv-ciaaa-aaaag-qjunq-cai --argument '(record{
+dfx deploy etcher_backend --specified-id dyb47-nqaaa-aaaag-qjvba-cai --argument '(record{
         network = variant { regtest };
         ckbtc_ledger = principal "mc6ru-gyaaa-aaaar-qaaaq-cai";
         ckbtc_minter = principal "ml52i-qqaaa-aaaar-qaaba-cai";

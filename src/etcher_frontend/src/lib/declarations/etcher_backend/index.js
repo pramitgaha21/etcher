@@ -9,7 +9,7 @@ export { idlFactory } from "./etcher_backend.did.js";
  * process.env.CANISTER_ID_<CANISTER_NAME_UPPERCASE>
  * beginning in dfx 0.15.0
  */
-export const canisterId = 'pvxnv-ciaaa-aaaag-qjunq-cai';
+export const canisterId = 'dyb47-nqaaa-aaaag-qjvba-cai';
 
 export const createActor = (canisterId, options = {}) => {
         const agent = options.agent || new HttpAgent({ ...options.agentOptions });

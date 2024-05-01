@@ -1,3 +1,4 @@
+import { InProd } from '$lib';
 import type { Identity } from '@dfinity/agent';
 import { AuthClient } from '@dfinity/auth-client';
 import { writable } from 'svelte/store';
@@ -6,10 +7,10 @@ type OptionalIdentity = null | Identity;
 
 export const identityStore = writable<OptionalIdentity>(null);
 
-const isLocalNetwork = true;
-const identityProviderUrl = isLocalNetwork
-        ? `http://${'rdmx6-jaaaa-aaaaa-aaadq-cai'}.localhost:4943`
-        : 'https://identity.ic0.app/';
+const identityProviderUrl = InProd
+        ? 'https://identity.ic0.app/'
+        : `http://${'rdmx6-jaaaa-aaaaa-aaadq-cai'}.localhost:4943`;
+
 
 export const connectII = async () => {
         const authClient = await AuthClient.create();
