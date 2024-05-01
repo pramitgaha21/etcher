@@ -2,7 +2,7 @@
 
 use std::{cell::RefCell, collections::HashMap, time::Duration};
 
-use bitcoin::{Address, Transaction};
+use bitcoin::Transaction;
 use btc_api::check_etching;
 use candid::{CandidType, Principal};
 use ckbtc_api::{CkBTC, CkBTCMinter, RetrieveBtcStatusV2};
@@ -14,11 +14,16 @@ use ic_cdk::{
     },
     init, query, update,
 };
-use ic_cdk_timers::TimerId;
+use ic_stable_structures::{
+    memory_manager::{MemoryId, MemoryManager, VirtualMemory},
+    writer::Writer,
+    DefaultMemoryImpl, Memory as _,
+};
 use icrc_ledger_types::icrc1::account::Account;
 use ordinals::Runestone;
 use schnorr_api::SchnorrKeyId;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use slotmap::{Key, KeyData};
 use utils::generate_subaccount;
 
 use crate::{
@@ -36,7 +41,7 @@ pub mod schnorr_api;
 pub mod tags;
 pub mod utils;
 
-#[derive(CandidType, Deserialize, Debug)]
+#[derive(CandidType, Serialize, Deserialize, Debug)]
 pub enum EcdsaKeyIds {
     TestKey1,
     ProductionKey,
@@ -56,14 +61,14 @@ impl EcdsaKeyIds {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueuedRevealTxn {
     pub reveal_txn: Transaction,
-    pub timer_id: TimerId,
-    pub commit_tx_address: Address,
+    pub timer_id: KeyData,
+    pub commit_tx_address: String,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize, Deserialize)]
 pub struct State {
     pub ckbtc_ledger: Option<Principal>,
     pub ckbtc_minter: Option<Principal>,
@@ -76,7 +81,14 @@ pub struct State {
     pub reveal_txn_in_queue: HashMap<u128, QueuedRevealTxn>,
 }
 
+pub type Memory = VirtualMemory<DefaultMemoryImpl>;
+
+pub fn get_upgrade_memory() -> Memory {
+    MEMORY_MANAGER.with_borrow(|memory| memory.get(MemoryId::new(0)))
+}
+
 thread_local! {
+    pub static MEMORY_MANAGER: RefCell<MemoryManager<DefaultMemoryImpl>> = RefCell::new(MemoryManager::init(DefaultMemoryImpl::default()));
     pub static STATE: RefCell<State> = RefCell::default();
 }
 
@@ -250,9 +262,9 @@ pub async fn etch_rune(mut args: EtchingArgs) -> (String, String) {
         ic_cdk::spawn(confirm_min_commitment_and_send_reveal_txn(id))
     });
     let queue_txn = QueuedRevealTxn {
-        commit_tx_address,
+        commit_tx_address: commit_tx_address.to_string(),
         reveal_txn: reveal_tx.clone(),
-        timer_id,
+        timer_id: timer_id.data(),
     };
     STATE.with_borrow_mut(|state| state.reveal_txn_in_queue.insert(id, queue_txn));
     (commit_txid, reveal_tx.txid().encode_hex())
@@ -260,7 +272,7 @@ pub async fn etch_rune(mut args: EtchingArgs) -> (String, String) {
 
 pub async fn confirm_min_commitment_and_send_reveal_txn(id: u128) {
     let reveal_txn = STATE.with_borrow(|state| state.reveal_txn_in_queue.get(&id).unwrap().clone());
-    let utxos_response = btc_api::get_utxos_of(reveal_txn.commit_tx_address.to_string()).await;
+    let utxos_response = btc_api::get_utxos_of(reveal_txn.commit_tx_address).await;
     let utxos = utxos_response.utxos;
     if utxos.is_empty() {
         ic_cdk::trap("No UTXOs Found")
@@ -269,7 +281,7 @@ pub async fn confirm_min_commitment_and_send_reveal_txn(id: u128) {
         ic_cdk::trap("Not enough commit confirmation")
     }
     btc_api::send_bitcoin_transaction(reveal_txn.reveal_txn).await;
-    ic_cdk_timers::clear_timer(reveal_txn.timer_id);
+    ic_cdk_timers::clear_timer(reveal_txn.timer_id.into());
     STATE.with_borrow_mut(|state| state.reveal_txn_in_queue.remove(&id));
 }
 

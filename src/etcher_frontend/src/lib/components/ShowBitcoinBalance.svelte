@@ -46,7 +46,7 @@
 </script>
 
 <div class="btc-balance">
-	<p>Your Bitcoin Balance: {btcBalance}</p>
+	<p>Your Bitcoin Balance: {btcBalance / BigInt(8)}</p>
 	<Button on:click={refreshBalance}>Refresh Balance</Button>
 </div>
 

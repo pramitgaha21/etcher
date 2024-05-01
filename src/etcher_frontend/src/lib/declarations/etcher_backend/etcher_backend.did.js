@@ -9,20 +9,21 @@ export const idlFactory = ({ IDL }) => {
     'ckbtc_minter' : IDL.Principal,
     'schnorr_canister' : IDL.Principal,
     'ckbtc_ledger' : IDL.Principal,
+    'timer_for_reveal_txn' : IDL.Nat32,
   });
   const EtchingArgs = IDL.Record({
-    'cap' : IDL.Opt(IDL.Nat),
-    'offset_stop' : IDL.Opt(IDL.Nat64),
-    'height_stop' : IDL.Opt(IDL.Nat64),
+    'cap' : IDL.Nat,
+    'offset_stop' : IDL.Nat64,
+    'height_stop' : IDL.Nat64,
     'turbo' : IDL.Bool,
-    'offset_start' : IDL.Opt(IDL.Nat64),
+    'offset_start' : IDL.Nat64,
     'premine' : IDL.Opt(IDL.Nat),
     'rune' : IDL.Text,
     'divisibility' : IDL.Nat8,
     'fee_rate' : IDL.Opt(IDL.Nat64),
-    'amount' : IDL.Opt(IDL.Nat),
-    'height_start' : IDL.Opt(IDL.Nat64),
-    'symbol' : IDL.Opt(IDL.Nat32),
+    'amount' : IDL.Nat,
+    'height_start' : IDL.Nat64,
+    'symbol' : IDL.Nat32,
   });
   const Account = IDL.Record({
     'owner' : IDL.Principal,
@@ -76,6 +77,7 @@ export const init = ({ IDL }) => {
     'ckbtc_minter' : IDL.Principal,
     'schnorr_canister' : IDL.Principal,
     'ckbtc_ledger' : IDL.Principal,
+    'timer_for_reveal_txn' : IDL.Nat32,
   });
   return [InitArgs];
 };

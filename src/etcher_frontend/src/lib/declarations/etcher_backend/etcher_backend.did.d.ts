@@ -10,24 +10,25 @@ export type BitcoinNetwork = { 'mainnet' : null } |
   { 'regtest' : null } |
   { 'testnet' : null };
 export interface EtchingArgs {
-  'cap' : [] | [bigint],
-  'offset_stop' : [] | [bigint],
-  'height_stop' : [] | [bigint],
+  'cap' : bigint,
+  'offset_stop' : bigint,
+  'height_stop' : bigint,
   'turbo' : boolean,
-  'offset_start' : [] | [bigint],
+  'offset_start' : bigint,
   'premine' : [] | [bigint],
   'rune' : string,
   'divisibility' : number,
   'fee_rate' : [] | [bigint],
-  'amount' : [] | [bigint],
-  'height_start' : [] | [bigint],
-  'symbol' : [] | [number],
+  'amount' : bigint,
+  'height_start' : bigint,
+  'symbol' : number,
 }
 export interface InitArgs {
   'network' : BitcoinNetwork,
   'ckbtc_minter' : Principal,
   'schnorr_canister' : Principal,
   'ckbtc_ledger' : Principal,
+  'timer_for_reveal_txn' : number,
 }
 export interface ReimbursementDeposit {
   'account' : Account,

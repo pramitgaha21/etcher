@@ -121,7 +121,7 @@ pub fn check_etching(height: u32, arg: &EtchingArgs) {
     if rune < minimum {
         ic_cdk::trap("Rune is less than Minimum")
     }
-    if !rune.is_reserved() {
+    if rune.is_reserved() {
         ic_cdk::trap("Rune is reserved")
     }
     if char::from_u32(arg.symbol).is_none() {

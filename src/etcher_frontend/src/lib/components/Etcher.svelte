@@ -10,9 +10,6 @@
 	import { Button } from './ui/button';
 	import { Label } from './ui/label';
 	import { Input } from './ui/input';
-	import Login from './Login.svelte';
-	import { Layout } from '@dfinity/gix-components';
-	import MessageModal from './MessageModal.svelte';
 
 	let payWithBtc = true;
 	let premineFlag = false;
@@ -65,14 +62,14 @@
 		console.log('constructing arugment');
 		let arg: EtchingArgs = {
 			rune,
-			symbol: [symbolIntoNum],
-			cap: [BigInt(cap)],
-			amount: [BigInt(amount)],
-			premine: [BigInt(premine)],
-			height_start: [BigInt(height_start)],
-			height_stop: [BigInt(height_stop)],
-			offset_start: [BigInt(offset_start)],
-			offset_stop: [BigInt(offset_stop)],
+			symbol: symbolIntoNum,
+			cap: BigInt(cap),
+			amount: BigInt(amount),
+			premine: premineFlag ? [BigInt(premine)] : [],
+			height_start: BigInt(height_start),
+			height_stop: BigInt(height_stop),
+			offset_start: BigInt(offset_start),
+			offset_stop: BigInt(offset_stop),
 			fee_rate: [],
 			divisibility: Number(divisibility),
 			turbo
@@ -134,8 +131,6 @@
 		<Input type="number" bind:value={cap} />
 		<Label>Amount</Label>
 		<Input type="number" bind:value={amount} />
-		<Label>Premine</Label>
-		<Input type="number" bind:value={premine} />
 		<Label>Height Start</Label>
 		<Input type="number" bind:value={height_start} />
 		<Label>Height Stop</Label>
@@ -144,11 +139,31 @@
 		<Input type="number" bind:value={offset_start} />
 		<Label>Offset Stop</Label>
 		<Input type="number" bind:value={offset_stop} />
+		<br />
+		<div class="premine-block">
+			<Button
+				on:click={() => {
+					premineFlag = !premineFlag;
+				}}>Premine</Button
+			>
+			{#if premineFlag}
+				<br />
+				<br />
+				<Label>Premine</Label>
+				<Input type="number" bind:value={premine} />
+				<br />
+				<br />
+			{/if}
+		</div>
+		<br />
+		<br />
 		<Button
 			on:click={() => {
 				turbo = !turbo;
 			}}>{turboButtonName}</Button
 		>
+		<br />
+		<br />
 		<Button
 			on:click={() => {
 				etchRunestone();

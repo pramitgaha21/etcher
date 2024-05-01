@@ -25,12 +25,13 @@
       "shrink": false
     },
     "etcher_backend": {
+      "package": "etcher_backend",
       "candid": "src/etcher_backend/etcher_backend.did",
       "declarations": {
         "node_compatibility": true
       },
-      "type": "custom",
-      "wasm": "wasm_files/etcher_backend.wasm"
+      "type": "rust",
+      "optimize": "cycles"
     },
     "schnorr_canister": {
       "type": "custom",
