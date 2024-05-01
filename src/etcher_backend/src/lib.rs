@@ -12,7 +12,7 @@ use ic_cdk::{
         bitcoin::BitcoinNetwork,
         ecdsa::{EcdsaCurve, EcdsaKeyId},
     },
-    init, query, update,
+    init, post_upgrade, pre_upgrade, query, update,
 };
 use ic_stable_structures::{
     memory_manager::{MemoryId, MemoryManager, VirtualMemory},
@@ -136,6 +136,37 @@ pub fn init(arg: InitArgs) {
         state.schnorr_key = Some(schnorr_key);
         state.timer_for_reveal_txn = arg.timer_for_reveal_txn;
     })
+}
+
+#[pre_upgrade]
+pub fn pre_upgrade() {
+    let mut state_bytes = vec![];
+    STATE
+        .with_borrow(|s| ciborium::ser::into_writer(&s, &mut state_bytes))
+        .expect("Failed to write bytes");
+    let len = state_bytes.len() as u32;
+    let mut memory = get_upgrade_memory();
+    let mut writer = Writer::new(&mut memory, 0);
+    writer.write(&len.to_le_bytes()).unwrap();
+    writer.write(&state_bytes).unwrap();
+}
+
+#[post_upgrade]
+pub fn post_upgrade() {
+    let memory = get_upgrade_memory();
+
+    // Read the length of the state bytes.
+    let mut state_len_bytes = [0; 4];
+    memory.read(0, &mut state_len_bytes);
+    let state_len = u32::from_le_bytes(state_len_bytes) as usize;
+
+    // Read the bytes
+    let mut state_bytes = vec![0; state_len];
+    memory.read(4, &mut state_bytes);
+
+    // Deserialize and set the state.
+    let state = ciborium::de::from_reader(&*state_bytes).expect("failed to decode state");
+    STATE.with(|s| *s.borrow_mut() = state);
 }
 
 #[update]
