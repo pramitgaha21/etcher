@@ -6,9 +6,9 @@
 ### Deployment Guide
 
 #### Pre-requisites
-[candid-extractor](https://github.com/dfinity/cdk-rs/tree/main/src/candid-extractor)
-[dfx](https://github.com/dfinity/sdk)
-[docker](https://www.docker.com)
+- [candid-extractor](https://github.com/dfinity/cdk-rs/tree/main/src/candid-extractor)
+- [dfx](https://github.com/dfinity/sdk)
+- [docker](https://www.docker.com)
 
 Running the docker
 ```bash
@@ -76,5 +76,5 @@ You've successfully etched a rune, check on http:localhost:8080/runes
 
 ### Address for mainnet
 
-frontend: https://kho2y-sqaaa-aaaag-qjuta-cai.icp0.io/
-backend: 
+- frontend: https://kho2y-sqaaa-aaaag-qjuta-cai.icp0.io/
+- backend: https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=dyb47-nqaaa-aaaag-qjvba-cai
