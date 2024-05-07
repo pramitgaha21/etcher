@@ -47,7 +47,7 @@ dfx deploy --specified-id pvm5g-xaaaa-aaaar-qaaia-cai ckbtc_kyt --argument '(var
 
 dfx deploy --specified-id mm444-5iaaa-aaaar-qaabq-cai ckbtc_index --argument '(opt variant{
         Init = record{
-                ledger_id = principal "ml52i-qqaaa-aaaar-qaaba-cai";
+                ledger_id = principal "mc6ru-gyaaa-aaaar-qaaaq-cai";
 }
 })'
 
