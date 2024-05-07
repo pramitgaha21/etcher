@@ -6,7 +6,7 @@ type EtchingArgs = record {
   height_stop : nat64;
   turbo : bool;
   offset_start : nat64;
-  premine : opt nat;
+  premine : nat;
   rune : text;
   divisibility : nat8;
   fee_rate : opt nat64;

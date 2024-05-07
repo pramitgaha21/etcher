@@ -196,7 +196,7 @@ pub async fn build_and_sign_etching_transaction(
     let mut reveal_output = vec![];
 
     let mut pointer = None;
-    if etching_args.premine.is_some() {
+    if etching_args.premine > 0 {
         reveal_output.push(TxOut {
             script_pubkey: caller_address.script_pubkey(),
             value: 10_000,
@@ -208,7 +208,7 @@ pub async fn build_and_sign_etching_transaction(
             rune: Some(rune),
             symbol: Some(symbol),
             divisibility: Some(etching_args.divisibility),
-            premine: etching_args.premine,
+            premine: Some(etching_args.premine),
             spacers: Some(spacers),
             turbo: etching_args.turbo,
             terms: Some(Terms {

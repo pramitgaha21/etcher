@@ -4,7 +4,7 @@
 </script>
 
 <div class="btc-payment">
-	<span>{$btcDepositAddress}</span>
+	<span>Your Bitcoin Address{$btcDepositAddress}</span>
 	<Copy value={$btcDepositAddress} />
 </div>
 

@@ -17,7 +17,7 @@ export const idlFactory = ({ IDL }) => {
     'height_stop' : IDL.Nat64,
     'turbo' : IDL.Bool,
     'offset_start' : IDL.Nat64,
-    'premine' : IDL.Opt(IDL.Nat),
+    'premine' : IDL.Nat,
     'rune' : IDL.Text,
     'divisibility' : IDL.Nat8,
     'fee_rate' : IDL.Opt(IDL.Nat64),

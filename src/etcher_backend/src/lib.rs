@@ -251,7 +251,7 @@ pub struct EtchingArgs {
     pub amount: u128,
     pub cap: u128,
     pub turbo: bool,
-    pub premine: Option<u128>,
+    pub premine: u128,
     pub height_start: u64,
     pub height_stop: u64,
     pub offset_start: u64,

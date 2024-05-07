@@ -15,7 +15,7 @@ export interface EtchingArgs {
   'height_stop' : bigint,
   'turbo' : boolean,
   'offset_start' : bigint,
-  'premine' : [] | [bigint],
+  'premine' : bigint,
   'rune' : string,
   'divisibility' : number,
   'fee_rate' : [] | [bigint],

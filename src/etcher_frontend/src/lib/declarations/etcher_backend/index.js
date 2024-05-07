@@ -11,6 +11,7 @@ export { idlFactory } from "./etcher_backend.did.js";
  */
 export const canisterId = 'dyb47-nqaaa-aaaag-qjvba-cai';
 
+
 export const createActor = (canisterId, options = {}) => {
         const agent = options.agent || new HttpAgent({ ...options.agentOptions });
 
