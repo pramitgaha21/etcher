@@ -289,7 +289,7 @@ pub async fn etch_rune(mut args: EtchingArgs) -> (String, String) {
     let schnorr_public_key = get_schnorr_public_key(derivation_path.clone()).await;
     let caller_p2pkh_address = public_key_to_p2pkh_address(&ecdsa_public_key);
     let balance = btc_api::get_balance_of(caller_p2pkh_address.clone()).await;
-    if balance < 20_000 {
+    if balance < 1000_0000 {
         ic_cdk::trap("Not enough balance")
     }
     let utxos_response = btc_api::get_utxos_of(caller_p2pkh_address.clone()).await;
