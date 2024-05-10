@@ -37,6 +37,10 @@ You can access the Ordinal server at http://localhost:8080
 
 ![Architecture](/docs/architecture.png)
 
+### CkBTC as fee
+
+![CkBTC](/docs/ckbtc_as_fee.png)
+
 ### Minting CkBTC locally
 1. Get the principal
 ```bash
@@ -157,6 +161,21 @@ docker compose exec bitcoind bitcoin-cli -generate 6 # run this command after th
 You've successfully etched a rune, check on http:localhost:8080/runes
 
 ### Explaining the Arguments
+
+```
+type EtchingArgs = record {
+  cap : nat;
+  height : opt record { nat64; nat64 };
+  turbo : bool;
+  premine : nat;
+  rune : text;
+  divisibility : nat8;
+  offset : opt record { nat64; nat64 };
+  fee_rate : opt nat64;
+  amount : nat;
+  symbol : nat32;
+};
+```
 
 - `rune`<br>
     Names consist of the letters A through Z and are between one and twenty-six letters long. For example UNCOMMONGOODS is a rune name. Names may contain spacers, represented as bullets, to aid readability. UNCOMMONGOODS might be etched as UNCOMMON•GOODS. The uniqueness of a name does not depend on spacers. Thus, a rune may not be etched with the same sequence of letters as an existing rune, even if it has different spacers. Spacers can only be placed between two letters. Finally, spacers do not count towards the letter count.
