@@ -1,11 +1,10 @@
 <script lang="ts">
-	import { InProd } from '$lib';
-	import { identityStore } from '$lib/stores/auth.store';
 	import { message } from '$lib/stores/message.modal';
-	import { HttpAgent } from '@dfinity/agent';
-	import Button from './ui/button/button.svelte';
 	import { type EtchingArgs } from '$lib/declarations/etcher_backend/etcher_backend.did';
 	import { canisterId, createActor } from '$lib/declarations/etcher_backend';
+	import PayWithBtc from './PayWithBtc.svelte';
+	import PayWithCkBtc from './PayWithCkBTC.svelte';
+	import Button from './ui/button/button.svelte';
 
 	let rune: string;
 	let divisibility: number;
@@ -18,32 +17,14 @@
 	let startOffset: number;
 	let endOffset: number;
 	let turbo: boolean = true;
+	let fee_rate = 20;
 
 	$: turboModeMessage = turbo ? 'Enabled' : 'Disabled';
+	$: withBlockHeight = true;
+	$: payWithBtc = true;
 
 	const etchRune = async () => {
-		let identity = $identityStore;
-		if (identity == null) {
-			message.set({
-				show: true,
-				messageTitle: 'Internet Identity not Found',
-				message: 'Please Login'
-			});
-			return;
-		}
-
-		const agent = new HttpAgent({ identity });
-		if (!InProd) {
-			agent.fetchRootKey().catch((e) => {
-				message.set({
-					show: true,
-					messageTitle: 'Failed to Fetch RootKey',
-					message: e
-				});
-				return;
-			});
-		}
-
+		console.log('etch rune called');
 		const premine = BigInt((percentage * cap) / 100);
 
 		const symbolAsUnicode = symbol.codePointAt(0);
@@ -63,15 +44,13 @@
 			cap: BigInt(cap),
 			amount: BigInt(amount),
 			divisibility,
-			height_start: BigInt(startHeight),
-			height_stop: BigInt(endHeight),
-			offset_start: BigInt(startOffset),
-			offset_stop: BigInt(endOffset),
-			fee_rate: [],
-			turbo
+			fee_rate: [BigInt(fee_rate)],
+			turbo,
+			height: withBlockHeight ? [[BigInt(startHeight), BigInt(endHeight)]] : [],
+			offset: !withBlockHeight ? [[BigInt(startOffset), BigInt(endOffset)]] : []
 		};
 
-		const actor = createActor(canisterId, { agent });
+		const actor = createActor(canisterId);
 		actor
 			.etch_rune(arg)
 			.then((result) => {
@@ -94,7 +73,43 @@
 	};
 </script>
 
-<form>
+<form on:submit|preventDefault={etchRune}>
+	<label for="payment-mode" class="label-note">
+		Pay Fee
+		<span class="note-icon" title="Additional Information">&#9432;</span>
+		<div class="note-content">Pay Fee for Etching with Bitcoin or CkBTC</div>
+	</label>
+	<div class="term-type">
+		<label class="term-type-label" class:selected={payWithBtc}>
+			<input
+				type="radio"
+				name="option"
+				value="payWithBtc"
+				bind:group={payWithBtc}
+				on:change={() => {
+					payWithBtc = true;
+				}}
+			/>
+			Pay with Bitcoin
+		</label>
+		<label class="term-type-label" class:selected={!payWithBtc}>
+			<input
+				type="radio"
+				name="option"
+				value="Pay with CkBTC"
+				bind:group={payWithBtc}
+				on:change={() => {
+					payWithBtc = false;
+				}}
+			/>
+			Pay with CkBTC
+		</label>
+	</div>
+	{#if payWithBtc}
+		<PayWithBtc />
+	{:else}
+		<PayWithCkBtc />
+	{/if}
 	<label for="rune" class="label-note">
 		Rune
 		<span class="note-icon" title="Additional Information">&#9432;</span>
@@ -155,46 +170,88 @@
 		<span class="note-icon" title="Additional Information">&#9432;</span>
 		<div class="note-content">
 			The etcher of a rune may optionally allocate to themselves units of the rune being etched.
+			When set to 100%, Runestone becomes unmintable.
 		</div>
 	</label>
 	<input type="range" id="premine" bind:value={percentage} min="0" max="100" required />
 	<span>{percentage}%</span>
 
 	<br />
-	<label for="startHeight" class="label-note">
-		Start Height
+	<label for="button-separator" class="label-note">
+		Set Mint Term with
 		<span class="note-icon" title="Additional Information">&#9432;</span>
-		<div class="note-content">The Mint is Open starting in the block with the given height.</div>
+		<div class="note-content">Set mint Term using either Height or Offset</div>
 	</label>
-	<input type="number" id="startHeight" name="startHeight" bind:value={startHeight} required />
+	<div class="term-type">
+		<label class="term-type-label" class:selected={withBlockHeight}>
+			<input
+				type="radio"
+				name="option"
+				value="Using Height"
+				bind:group={withBlockHeight}
+				on:change={() => {
+					withBlockHeight = true;
+				}}
+			/>
+			Using Height
+		</label>
+		<label class="term-type-label" class:selected={!withBlockHeight}>
+			<input
+				type="radio"
+				name="option"
+				value="Using Offset"
+				bind:group={withBlockHeight}
+				on:change={() => {
+					withBlockHeight = false;
+				}}
+			/>
+			Using Offset
+		</label>
+	</div>
+	{#if withBlockHeight}
+		<label for="startHeight" class="label-note">
+			Start Height
+			<span class="note-icon" title="Additional Information">&#9432;</span>
+			<div class="note-content">The Mint is Open starting in the block with the given height.</div>
+		</label>
+		<input type="number" id="startHeight" name="startHeight" bind:value={startHeight} required />
 
-	<label for="endHeight" class="label-note">
-		End Height
-		<span class="note-icon" title="Additional Information">&#9432;</span>
-		<div class="note-content">The Mint is closed in the block with the given height.</div>
-	</label>
-	<input type="number" id="endHeight" name="endHeight" bind:value={endHeight} required />
+		<label for="endHeight" class="label-note">
+			End Height
+			<span class="note-icon" title="Additional Information">&#9432;</span>
+			<div class="note-content">The Mint is closed in the block with the given height.</div>
+		</label>
+		<input type="number" id="endHeight" name="endHeight" bind:value={endHeight} required />
+	{:else}
+		<label for="startOffset" class="label-note">
+			Start Offset
+			<span class="note-icon" title="Additional Information">&#9432;</span>
+			<div class="note-content">
+				A mint is open starting in the block whose height is equal to the start offset plus the
+				height of the block in which the rune was etched.
+			</div>
+		</label>
+		<input type="number" id="startOffset" name="startOffset" bind:value={startOffset} required />
 
-	<br />
-	<label for="startOffset" class="label-note">
-		Start Offset
-		<span class="note-icon" title="Additional Information">&#9432;</span>
-		<div class="note-content">
-			A mint is open starting in the block whose height is equal to the start offset plus the height
-			of the block in which the rune was etched.
-		</div>
-	</label>
-	<input type="number" id="startOffset" name="startOffset" bind:value={startOffset} required />
+		<label for="endOffset" class="label-note">
+			End Offset
+			<span class="note-icon" title="Additional Information">&#9432;</span>
+			<div class="note-content">
+				A rune may not be minted in or after the block whose height is equal to the end offset plus
+				the height of the block in which the rune was etched.
+			</div>
+		</label>
+		<input type="number" id="endOffset" name="endOffset" bind:value={endOffset} required />
+	{/if}
 
-	<label for="endOffset" class="label-note">
-		End Offset
+	<label for="feeRate" class="label-note">
+		Fee Rate
 		<span class="note-icon" title="Additional Information">&#9432;</span>
-		<div class="note-content">
-			A rune may not be minted in or after the block whose height is equal to the end offset plus
-			the height of the block in which the rune was etched.
-		</div>
+		<div class="note-content">More the fee, transaction will be priortized</div>
 	</label>
-	<input type="number" id="endOffset" name="endOffset" bind:value={endOffset} required />
+
+	<input type="range" id="feeRate" name="feeRate" bind:value={fee_rate} min="1" max="200" />
+	<p>Fee Rate: {fee_rate}</p>
 
 	<label for="turbo" class="label-note">
 		Turbo Mode
@@ -205,7 +262,8 @@
 	<input type="checkbox" bind:checked={turbo} />
 	<span>{turboModeMessage}</span>
 	<br />
-	<Button on:click={etchRune}>Etch Rune</Button>
+
+	<Button type="submit">Etch Rune</Button>
 </form>
 
 <style>
@@ -308,5 +366,36 @@
 	/* Focus State */
 	input[type='checkbox']:focus {
 		box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.4);
+	}
+
+	.term-type {
+		display: flex;
+		flex-direction: row;
+		gap: 8px;
+	}
+
+	input[type='radio'] {
+		appearance: none;
+		-webkit-appearance: none;
+		-moz-appearance: none;
+	}
+
+	input[type='radio']:checked {
+		/* Styles for the selected radio button */
+		border-color: #98fb98;
+		background-color: #98fb98;
+	}
+
+	.term-type-label {
+		display: block;
+		padding: 8px 12px;
+		border-radius: 4px;
+		background-color: #f0f0f0;
+		cursor: pointer;
+	}
+
+	.term-type-label.selected {
+		background-color: #98fb98;
+		color: #333;
 	}
 </style>

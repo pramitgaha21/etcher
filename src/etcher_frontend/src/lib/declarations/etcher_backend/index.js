@@ -9,8 +9,8 @@ export { idlFactory } from "./etcher_backend.did.js";
  * process.env.CANISTER_ID_<CANISTER_NAME_UPPERCASE>
  * beginning in dfx 0.15.0
  */
-export const canisterId = 'dyb47-nqaaa-aaaag-qjvba-cai';
-
+export const canisterId = "dyb47-nqaaa-aaaag-qjvba-cai";
+export const InProd = false;
 
 export const createActor = (canisterId, options = {}) => {
         const agent = options.agent || new HttpAgent({ ...options.agentOptions });
@@ -19,6 +19,16 @@ export const createActor = (canisterId, options = {}) => {
                 console.warn(
                         "Detected both agent and agentOptions passed to createActor. Ignoring agentOptions and proceeding with the provided agent."
                 );
+        }
+
+        // Fetch root key for certificate validation during development
+        if (!InProd) {
+                agent.fetchRootKey().catch((err) => {
+                        console.warn(
+                                "Unable to fetch root key. Check to ensure that your local replica is running"
+                        );
+                        console.error(err);
+                });
         }
 
         // Creates an actor with using the candid interface and the HttpAgent

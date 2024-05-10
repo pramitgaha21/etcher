@@ -1,17 +1,14 @@
-type Account = record { owner : principal; subaccount : opt blob };
 type BitcoinNetwork = variant { mainnet; regtest; testnet };
 type EtchingArgs = record {
   cap : nat;
-  offset_stop : nat64;
-  height_stop : nat64;
+  height : opt record { nat64; nat64 };
   turbo : bool;
-  offset_start : nat64;
   premine : nat;
   rune : text;
   divisibility : nat8;
+  offset : opt record { nat64; nat64 };
   fee_rate : opt nat64;
   amount : nat;
-  height_start : nat64;
   symbol : nat32;
 };
 type InitArgs = record {
@@ -21,32 +18,12 @@ type InitArgs = record {
   ckbtc_ledger : principal;
   timer_for_reveal_txn : nat32;
 };
-type ReimbursementDeposit = record {
-  account : Account;
-  mint_block_index : nat64;
-  amount : nat64;
-  reason : ReimbursementReason;
-};
-type ReimbursementReason = variant {
-  CallFailed;
-  TaintedDestination : record { kyt_fee : nat64; kyt_provider : principal };
-};
-type RetrieveBtcStatusV2 = variant {
-  Signing;
-  Confirmed : record { txid : blob };
-  Sending : record { txid : blob };
-  AmountTooLow;
-  WillReimburse : ReimbursementDeposit;
-  Unknown;
-  Submitted : record { txid : blob };
-  Reimbursed : ReimbursementDeposit;
-  Pending;
-};
 service : (InitArgs) -> {
   confirm_and_convert_ckbtc : () -> (nat64);
   etch_rune : (EtchingArgs) -> (text, text);
   get_btc_balance : () -> (nat64);
   get_deposit_address_for_bitcoin : () -> (text);
   get_deposit_address_for_ckbtc : () -> (text) query;
-  query_converstion_status : (nat64) -> (RetrieveBtcStatusV2) composite_query;
+  get_estimated_cbktc_conversion_fee : () -> (nat64) composite_query;
+  query_conversion_status : (nat64) -> (text) composite_query;
 }

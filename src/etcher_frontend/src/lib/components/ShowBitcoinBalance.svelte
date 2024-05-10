@@ -1,34 +1,13 @@
 <script lang="ts">
-	import { InProd } from '$lib';
 	import { canisterId, createActor } from '$lib/declarations/etcher_backend';
-	import { identityStore } from '$lib/stores/auth.store';
 	import { message } from '$lib/stores/message.modal';
-	import { HttpAgent } from '@dfinity/agent';
+	import { onMount } from 'svelte';
 	import Button from './ui/button/button.svelte';
 
-	$: btcBalance = BigInt(0);
+	$: btcBalance = 0n;
 
 	const refreshBalance = async () => {
-		let identity = $identityStore;
-		if (identity == null) {
-			message.set({
-				show: true,
-				messageTitle: 'Internet Identity not Logged in',
-				message: 'Please Login with your Internet Identity'
-			});
-			return;
-		}
-		const agent = new HttpAgent({ identity });
-		if (!InProd) {
-			await agent.fetchRootKey().catch((e) => {
-				message.set({
-					show: true,
-					messageTitle: 'Failed to fetch root key',
-					message: e
-				});
-			});
-		}
-		const actor = createActor(canisterId, { agent });
+		const actor = createActor(canisterId);
 		actor
 			.get_btc_balance()
 			.then((balance) => {
@@ -43,10 +22,14 @@
 				});
 			});
 	};
+
+	onMount(async () => {
+		await refreshBalance();
+	});
 </script>
 
 <div class="btc-balance">
-	<p>Your Bitcoin Balance: {btcBalance / BigInt(8)}</p>
+	<p>Your Bitcoin Balance in Satoshis: {btcBalance}₿</p>
 	<Button on:click={refreshBalance}>Refresh Balance</Button>
 </div>
 
@@ -54,9 +37,17 @@
 	.btc-balance {
 		display: flex;
 		align-items: center;
+		justify-content: center;
+		padding: 20px;
+		background-color: #f5f5f5;
+		border-radius: 8px;
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 	}
 
 	.btc-balance p {
-		margin-right: 1rem;
+		font-size: 18px;
+		font-weight: bold;
+		color: #333;
+		margin-right: 20px;
 	}
 </style>

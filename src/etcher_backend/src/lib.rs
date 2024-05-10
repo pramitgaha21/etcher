@@ -5,7 +5,7 @@ use std::{cell::RefCell, collections::HashMap, time::Duration};
 use bitcoin::Transaction;
 use btc_api::check_etching;
 use candid::{CandidType, Principal};
-use ckbtc_api::{CkBTC, CkBTCMinter, RetrieveBtcStatusV2};
+use ckbtc_api::{CkBTC, CkBTCMinter};
 use hex::ToHex;
 use ic_cdk::{
     api::management_canister::{
@@ -24,14 +24,12 @@ use ordinals::Runestone;
 use schnorr_api::SchnorrKeyId;
 use serde::{Deserialize, Serialize};
 use slotmap::{Key, KeyData};
-use utils::generate_subaccount;
 
 use crate::{
     btc_api::build_and_sign_etching_transaction,
-    ckbtc_api::RetrieveBtcArgs,
     ecdsa_api::get_ecdsa_public_key,
     schnorr_api::get_schnorr_public_key,
-    utils::{always_fail, generate_derivation_path, public_key_to_p2pkh_address, validate_caller},
+    utils::{always_fail, generate_derivation_path, public_key_to_p2pkh_address},
 };
 
 pub mod btc_api;
@@ -171,7 +169,7 @@ pub fn post_upgrade() {
 
 #[update]
 pub async fn get_deposit_address_for_bitcoin() -> String {
-    let caller = validate_caller();
+    let caller = ic_cdk::id();
     let derivation_path = generate_derivation_path(&caller);
     let ecdsa_public_key = get_ecdsa_public_key(derivation_path).await;
     public_key_to_p2pkh_address(&ecdsa_public_key)
@@ -179,7 +177,7 @@ pub async fn get_deposit_address_for_bitcoin() -> String {
 
 #[update]
 pub async fn get_btc_balance() -> u64 {
-    let caller = validate_caller();
+    let caller = ic_cdk::id();
     let derivation_path = generate_derivation_path(&caller);
     let ecdsa_public_key = get_ecdsa_public_key(derivation_path).await;
     let address = public_key_to_p2pkh_address(&ecdsa_public_key);
@@ -188,52 +186,76 @@ pub async fn get_btc_balance() -> u64 {
 
 #[query]
 pub fn get_deposit_address_for_ckbtc() -> String {
-    let caller = validate_caller();
-    let subaccount = generate_subaccount(&caller);
     Account {
         owner: ic_cdk::id(),
-        subaccount: Some(subaccount),
+        subaccount: None,
     }
     .to_string()
 }
 
+#[query(composite = true)]
+pub async fn get_estimated_cbktc_conversion_fee() -> u64 {
+    let ckbtc_minter = STATE.with_borrow(|state| CkBTCMinter::new(state.ckbtc_minter.unwrap()));
+    let response = ckbtc_minter.estimate_withdrawal_fee(None).await;
+    response.bitcoin_fee + response.minter_fee
+}
+
 #[update]
 pub async fn confirm_and_convert_ckbtc() -> u64 {
-    let caller = validate_caller();
-    let subaccount = generate_subaccount(&caller);
+    let caller = ic_cdk::id();
     let account = Account {
-        owner: ic_cdk::id(),
-        subaccount: Some(subaccount),
+        owner: caller,
+        subaccount: None,
     };
     let (ckbtc_minter, ckbtc_ledger) = STATE.with_borrow(|state| {
-        let ckbtc_minter = *state.ckbtc_minter.as_ref().unwrap();
-        let ckbtc_ledger = *state.ckbtc_ledger.as_ref().unwrap();
-        (CkBTCMinter::new(ckbtc_minter), CkBTC::new(ckbtc_ledger))
+        let ckbtc_minter = CkBTCMinter::new(state.ckbtc_minter.unwrap());
+        let ckbtc_ledger = CkBTC::new(state.ckbtc_ledger.unwrap());
+        (ckbtc_minter, ckbtc_ledger)
     });
     let balance = ckbtc_ledger.get_balance_of(account).await;
-    if balance < 20000 {
-        ic_cdk::trap("Not enough balance")
+    let balance = u64::try_from(balance).unwrap();
+    ic_cdk::println!("Balance: {}", balance);
+    let estimated_fee = ckbtc_minter.estimate_withdrawal_fee(Some(balance)).await;
+    let deposit_fee = ckbtc_minter.get_deposit_fee().await;
+    let total_fee = estimated_fee.bitcoin_fee + estimated_fee.minter_fee;
+    if balance <= total_fee + deposit_fee + 20000 {
+        let err_msg = format!(
+            "Balance too Low! Current Balance: {}, Expected atleast {}",
+            balance,
+            total_fee + deposit_fee + 20000
+        );
+        ic_cdk::trap(&err_msg)
     }
     let derivation_path = generate_derivation_path(&caller);
     let ecdsa_public_key = get_ecdsa_public_key(derivation_path.clone()).await;
-    let caller_p2pkh_address = public_key_to_p2pkh_address(&ecdsa_public_key);
-    let result = ckbtc_minter
-        .retrieve_btc(RetrieveBtcArgs {
-            address: caller_p2pkh_address,
-            amount: balance as u64,
+    let p2pkh_address = public_key_to_p2pkh_address(&ecdsa_public_key);
+    let ckbtc_deposit_address = ckbtc_minter.get_withdrawal_account().await;
+    if let Err(e) = ckbtc_ledger
+        .icrc1_transfer(ckbtc_deposit_address, balance as u128)
+        .await
+    {
+        let err_msg = format!("{:?}", e);
+        ic_cdk::trap(&err_msg)
+    }
+    let amount = balance - 10 - total_fee - deposit_fee;
+    ic_cdk::println!("Amount: {}", amount);
+    match ckbtc_minter
+        .retrieve_btc(ckbtc_api::RetrieveBtcArgs {
+            address: p2pkh_address,
+            amount,
         })
-        .await;
-    match result {
+        .await
+    {
+        Ok(index) => index.block_index,
         Err(e) => {
-            let err = format!("{:?}", e);
-            ic_cdk::trap(&err)
+            let err_msg = format!("{:?}", e);
+            ic_cdk::trap(&err_msg)
         }
-        Ok(ok) => ok.block_index,
     }
 }
 
 #[query(composite = true)]
-pub async fn query_converstion_status(block_index: u64) -> RetrieveBtcStatusV2 {
+pub async fn query_conversion_status(block_index: u64) -> String {
     let ckbtc_minter = STATE.with_borrow(|state| {
         let canister_id = *state.ckbtc_minter.as_ref().unwrap();
         CkBTCMinter::new(canister_id)
@@ -241,6 +263,7 @@ pub async fn query_converstion_status(block_index: u64) -> RetrieveBtcStatusV2 {
     ckbtc_minter
         .retrieve_btc_status_v2(ckbtc_api::RetrieveBtcStatusArgs { block_index })
         .await
+        .to_string()
 }
 
 #[derive(CandidType, Deserialize, Debug)]
@@ -252,23 +275,21 @@ pub struct EtchingArgs {
     pub cap: u128,
     pub turbo: bool,
     pub premine: u128,
-    pub height_start: u64,
-    pub height_stop: u64,
-    pub offset_start: u64,
-    pub offset_stop: u64,
+    pub height: Option<(u64, u64)>,
+    pub offset: Option<(u64, u64)>,
     pub fee_rate: Option<u64>,
 }
 
 #[update]
 pub async fn etch_rune(mut args: EtchingArgs) -> (String, String) {
-    let caller = validate_caller();
+    let caller = ic_cdk::id();
     args.rune = args.rune.to_ascii_uppercase();
     let derivation_path = generate_derivation_path(&caller);
     let ecdsa_public_key = get_ecdsa_public_key(derivation_path.clone()).await;
     let schnorr_public_key = get_schnorr_public_key(derivation_path.clone()).await;
     let caller_p2pkh_address = public_key_to_p2pkh_address(&ecdsa_public_key);
     let balance = btc_api::get_balance_of(caller_p2pkh_address.clone()).await;
-    if balance < 10_000 {
+    if balance < 20_000 {
         ic_cdk::trap("Not enough balance")
     }
     let utxos_response = btc_api::get_utxos_of(caller_p2pkh_address.clone()).await;

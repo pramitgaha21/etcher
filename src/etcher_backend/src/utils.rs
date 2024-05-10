@@ -22,14 +22,6 @@ pub fn generate_subaccount(principal: &Principal) -> Subaccount {
     hash
 }
 
-pub fn validate_caller() -> Principal {
-    let caller = ic_cdk::caller();
-    if caller == Principal::anonymous() {
-        ic_cdk::trap("Anonymous Caller not Allowed")
-    }
-    caller
-}
-
 // In the following, we register a custom getrandom implementation because
 // otherwise getrandom (which is a dependency of k256) fails to compile.
 // This is necessary because getrandom by default fails to compile for the

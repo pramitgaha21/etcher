@@ -111,6 +111,9 @@ pub fn build_reveal_transaction(
 }
 
 pub fn check_etching(height: u32, arg: &EtchingArgs) {
+    if arg.height.is_none() && arg.offset.is_none() {
+        ic_cdk::trap("No mint term selected")
+    }
     let network = STATE.with_borrow(|state| match state.network.as_ref().unwrap() {
         BitcoinNetwork::Mainnet => Network::Bitcoin,
         BitcoinNetwork::Testnet => Network::Testnet,
@@ -133,11 +136,15 @@ pub fn check_etching(height: u32, arg: &EtchingArgs) {
     if arg.divisibility > 38 {
         ic_cdk::trap("Exceeds max allowed divisibility")
     }
-    if arg.offset_stop < arg.offset_start {
-        ic_cdk::trap("Offet End must be greater than Offset Start")
+    if let Some((start, stop)) = arg.height {
+        if start >= stop {
+            ic_cdk::trap("Height Start must be lower than Height Stop")
+        }
     }
-    if arg.height_stop < arg.height_start {
-        ic_cdk::trap("Height End must be greater then Height Start")
+    if let Some((start, stop)) = arg.offset {
+        if start >= stop {
+            ic_cdk::trap("Offset Start must be lower than Offset Stop")
+        }
     }
 }
 
@@ -203,6 +210,22 @@ pub async fn build_and_sign_etching_transaction(
         });
         pointer = Some(reveal_output.len() as u32 - 1u32);
     }
+    let (height, offset) = match (etching_args.height, etching_args.offset) {
+        (Some((start, stop)), None) => {
+            let height = (Some(start), Some(stop));
+            (height, (None, None))
+        }
+        (None, Some((start, stop))) => {
+            let offset = (Some(start), Some(stop));
+            ((None, None), offset)
+        }
+        (Some((h_start, h_stop)), Some((o_start, o_stop))) => {
+            let height = (Some(h_start), Some(h_stop));
+            let offset = (Some(o_start), Some(o_stop));
+            (height, offset)
+        }
+        (None, None) => ic_cdk::trap("No Term Set"),
+    };
     let runestone = Runestone {
         etching: Some(Etching {
             rune: Some(rune),
@@ -214,14 +237,8 @@ pub async fn build_and_sign_etching_transaction(
             terms: Some(Terms {
                 cap: Some(etching_args.cap),
                 amount: Some(etching_args.amount),
-                height: (
-                    Some(etching_args.height_start),
-                    Some(etching_args.height_stop),
-                ),
-                offset: (
-                    Some(etching_args.offset_start),
-                    Some(etching_args.offset_stop),
-                ),
+                height,
+                offset,
             }),
         }),
         edicts: vec![],
@@ -281,6 +298,7 @@ pub async fn build_and_sign_etching_transaction(
     let commit_fee =
         FeeRate::from_sat_per_vb(fee_rate.to_sat_per_kwu() * commit_tx.vsize() as u64 + sig_bytes)
             .unwrap();
+    ic_cdk::println!("commit fee: {}\nreveal fee: {}", commit_fee, reveal_fee);
     commit_tx.output[0].value = total_spent - commit_fee.to_sat_per_kwu();
 
     // signing the commit_tx
@@ -344,7 +362,7 @@ pub async fn build_and_sign_etching_transaction(
         .taproot_encode_signing_data_to(
             &mut signing_data,
             0,
-            &Prevouts::All(commit_tx.output.as_slice()),
+            &Prevouts::All(&[commit_tx.output[vout].clone()]),
             None,
             Some((leaf_hash, 0xFFFFFFFF)),
             TapSighashType::Default,
