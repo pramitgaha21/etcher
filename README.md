@@ -28,7 +28,7 @@ chmod +x deploy.sh
 ```
 
 ### Ordinal Server
-You can access the Ordinal server at http://localhost:8080
+You can access the Ordinal server at `http://localhost:8080`
 
 ### Known Issues
 - After the timer hits for Rune's reveal transaction while requesting the `Utxos`, The Canister might panic due to Bitcoin's canister not being fully synced. This will cause the reveal transaction to be submitted on the next timer interval
@@ -158,7 +158,7 @@ docker compose exec bitcoind bitcoin-cli -generate 6 # mine 6 blocks for reveal 
 
 docker compose exec bitcoind bitcoin-cli -generate 6 # run this command after the reveal transaction is submitted
 ```
-You've successfully etched a rune, check on http:localhost:8080/runes
+You've successfully etched a rune, check on `http://localhost:8080/runes`
 
 ### Explaining the Arguments
 
