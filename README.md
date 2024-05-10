@@ -196,7 +196,7 @@ type EtchingArgs = record {
 - `height`<br>
     This field is used for setting up mint terms. For e.g. `opt record {1000; 2000}` means the runestone will be able to be minted between block of number 1000 and 2000
 - `offset`<br>
-    This field is used for setting up mint terms. For e.g. If `offset` was set to `opt record {1000; 2000}`, and the Etching transaction was mined at block number 1200, it means block number `1200 + 1000` and `1200 + 2000`: The runestone is mintable
+        This field is used for setting up mint terms. For e.g. If `offset` was set to `opt record {1000; 2000}`, and the Etching transaction was mined at block number 1200, it means between block number `1200 + 1000` and `1200 + 2000`: The runestone is mintable
 
 ### Address for mainnet
 
