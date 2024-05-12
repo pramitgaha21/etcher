@@ -1,5 +1,8 @@
 use std::str::FromStr;
 
+use crate::{
+    ecdsa_api::ecdsa_sign, schnorr_api, tags::Tag, utils::sec1_to_der, EtchingArgs, STATE,
+};
 use bitcoin::{
     absolute::LockTime,
     consensus,
@@ -17,10 +20,6 @@ use bitcoin::{
 use hex::ToHex;
 use ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, GetUtxosResponse, Utxo};
 use ordinals::{Artifact, Etching, Rune, Runestone, SpacedRune, Terms};
-
-use crate::{
-    ecdsa_api::ecdsa_sign, schnorr_api, tags::Tag, utils::sec1_to_der, EtchingArgs, STATE,
-};
 
 pub const SIG_HASH_TYPE: EcdsaSighashType = EcdsaSighashType::All;
 
@@ -345,7 +344,7 @@ pub async fn build_and_sign_etching_transaction(
                 previous_output: *outpoint,
                 witness: Witness::new(),
                 script_sig: ScriptBuf::new(),
-                sequence: Sequence::from_height(Runestone::COMMIT_CONFIRMATIONS),
+                sequence: Sequence::from_height(Runestone::COMMIT_CONFIRMATIONS - 1),
             })
             .collect(),
         output: reveal_output,
