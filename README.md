@@ -37,6 +37,10 @@ You can access the Ordinal server at `http://localhost:8080`
 
 ![Architecture](/docs/architecture.png)
 
+To be a valid Runestone, the Reveal Transaction is needed to be sent after 5 blocks are mined after sending the Commit Transaction. The Reveal Transaction also requires 6 confirmation.
+
+`Note: For the the local deployment, the timer is set to 1min but for the mainnet deployment set the timer to 50mins.`
+
 ### CkBTC as fee
 
 ![CkBTC](/docs/ckbtc_as_fee.png)
